@@ -422,7 +422,7 @@ async function load(q){
  S.checks=(k.data||[]).map(x=>({id:x.cid,name:esc(x.name),res:x.res,by:esc(x.by_name),t:new Date(x.created_at).toLocaleString(),iso:x.created_at,rid:Number(x.id)}));
   if(S.role==='checker'){const m=lsMap(LOGK());let ch=0;S.checks.forEach(k=>{if(k.by===S.user&&(!m[k.id]||m[k.id].res!==k.res||!m[k.id].t)){m[k.id]={t:k.iso,res:k.res,name:k.name};ch=1}});if(ch)lsSet(LOGK(),m)}
  if(S.loaded)for(const x of S.catches){const o=old[x.id];if(!o)continue;
-  if(!ongoing(o)&&ongoing(x)&&offFloor(x))note('On-going transaction',`${x.id} has an on-going transaction. Claiming reopens, or the lot is Sold out, once the cash pickup QR is scanned.`);
+  if(!ongoing(o)&&ongoing(x)&&offFloor(x))note('On-going transaction',`${x.id} has an on-going transaction. Claiming reopens once the cash pickup QR is scanned.`);
   if(!soldOut(o)&&soldOut(x)){if(!x.sold_out_at){const m=lsMap(SEENK());if(!m[x.id]){m[x.id]=new Date().toISOString();lsSet(SEENK(),m)}}
     note('Sold out',mine(x)?`${x.id} is sold out and added to your Sales History.`:`${x.id} is fully claimed and moved to Sold Out / Closed Catches.`)}
   /* the database says who holds each bid, so the alerts are exact: no guessing, no false alarms from your own raise */
@@ -674,7 +674,7 @@ function dlReceipt(id){const p=(S.pass&&S.pass.id===id?S.pass:null)||S.passes.fi
 //-> Calls the Supabase claim_portion RPC, stores the returned escrow pass in state, reloads records, and redraws.
 async function doClaim(id,kg,pay){const lot=find(id),wasLast=!!lot&&+lot.tubs<=1&&kg>=open(lot)-1e-9;const{data,error}=await sb.rpc('claim_portion',{p_cid:id,p_kg:kg});if(error){toast(error.message,1);return false}
  if(pay&&data&&data.id)await paySave(data.id,pay);
- toast((pay?'Payment received. Escrow pass generated.':'Portion claimed.')+(wasLast?' This lot is now Sold out.':''));S.pm=null;S.pay=null;S.pass=data&&data.pass_token?{...data,pay,t:new Date(data.created_at).toLocaleString()}:null;await load(1);render();return true}
+ S.pm=null;S.pay=null;S.pass=data&&data.pass_token?{...data,pay,t:new Date(data.created_at).toLocaleString()}:null;await load(1);const nl=find(id);toast((pay?'Payment received. Escrow pass generated.':'Portion claimed.')+(wasLast&&nl&&soldOut(nl)?' This lot is now Sold out.':''));render();return true}
 
 // ---> broker winning-bid payment (cash / cashless demo) <---
 //-> Flow: When a broker wins an auction, a payment dialog offers Cash or Cashless (demo only). "Pay amount" records the payment and opens a receipt dialog with a downloadable PNG.
@@ -1449,7 +1449,7 @@ const sfBar=()=>`<div class="mb-4 flex items-center gap-2 overflow-x-auto pb-1">
 function soldV(){const ps=histPasses(),l=S.catches.filter(c=>fullyClaimed(c)||ongoing(c)).filter(c=>SF==='all'||(SF==='closed'?!!c.closed:SF==='ongoing'?ongoing(c):soldOut(c)&&!c.closed)).sort((a,b)=>lotLast(b,ps)-lotLast(a,ps));
  return h1('Sold Out / Closed Catches',`${l.length} lot(s) sold out, closed or on-going. Fully claimed lots no longer appear on Fresh Catches.`)
  +sfBar()+`<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${l.map(c=>{const cp=ps.filter(p=>p.cid===c.id),held=cp.filter(p=>p.status==='escrow').length,kg=cp.reduce((a,p)=>a+(+p.kg||0),0);
-  return`<div class="card overflow-hidden flex flex-col"><div class="h-24 bg-gradient-to-br from-[#0B4A5D] to-[#006878] p-3 flex justify-between"${c.photo?` style="background:url(${c.photo}) center/cover"`:''}><span class="badge ${c.closed?'bg-emerald-100 text-emerald-800':'bg-yellow-100 text-yellow-800'} h-fit">${c.closed?'Closed':'Sold out'}</span><span class="font-mono text-xs text-white/80">${c.id}</span></div>
+  return`<div class="card overflow-hidden flex flex-col"><div class="h-24 bg-gradient-to-br from-[#0B4A5D] to-[#006878] p-3 flex justify-between"${c.photo?` style="background:url(${c.photo}) center/cover"`:''}>${lotTag(c)||'<span></span>'}<span class="font-mono text-xs text-white/80">${c.id}</span></div>
   <div class="p-4 flex flex-1 flex-col"><h3 class="font-semibold text-lg min-h-[3.5rem]">${c.name}</h3>
   <div class="flex justify-between items-end my-2"><span class="font-mono text-2xl font-bold">${fmt(c.price)}/kg</span><span class="text-sm font-mono">${c.kg} kg / tub</span></div>
   <div class="text-xs text-slate-500">${lotTag(c)} ${c.closed?'All escrow released.':ongoing(c)?'Claiming is paused until the cash pickup QR is scanned.':held?held+' escrow pass(es) still held.':'Fully claimed and paid.'}</div>
