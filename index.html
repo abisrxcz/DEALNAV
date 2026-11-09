@@ -663,17 +663,17 @@ function dlReceipt(id){const p=(S.pass&&S.pass.id===id?S.pass:null)||S.passes.fi
  const pay=p.pay||payOf(p),c=find(p.cid),kg=+p.kg,total=+p.total,t=c?tar(c.price,kg):null,item=t&&Math.abs(t.total-total)<.01;
  const rows=[['Receipt no.',p.id],['Date',new Date(p.created_at||Date.now()).toLocaleString()],['Vendor',S.user||''],['Catch',String(p.name||'')],['Portion weight',kg+' kg']];
  const items=item?[['Base ('+fmt(c.price)+' × '+kg+' kg)',fmt(t.base)],['Port fee (₱2.50/kg)',fmt(t.port)],['Broker commission (5%)',fmt(t.comm)],['Ice / tub handling',fmt(t.ice)]]:[];
- const pr=[['Payment method',payLbl(pay&&pay.method)],['Payment ref.',pay?String(pay.ref):'—'],['Status',p.status==='escrow'?'Escrow held':'Released']];
- const notes=['Escrow is released once the broker verifies pickup.'].concat(pay&&pay.method==='cashless'?['Cashless payment is for demo only. No real money was charged.']:[]);
+ const pr=[['Payment method',payLbl(pay&&pay.method)],['Payment ref.',pay&&pay.method!=='cash'?String(pay.ref):'—'],['Status',p.status==='escrow'?'Escrow held':'Released']];
+ const notes=[pay&&pay.method==='cash'?'Pay the exact amount in cash at dockside pickup.':'Escrow is released once the broker verifies pickup.'].concat(pay&&pay.method==='cashless'?['Cashless payment is for demo only. No real money was charged.']:[]);
  const S2=2,W=640,H=150+(rows.length+items.length+pr.length)*30+90+notes.length*22+40,cv=document.createElement('canvas');cv.width=W*S2;cv.height=H*S2;
  const x=cv.getContext('2d');x.scale(S2,S2);x.fillStyle='#fff';x.fillRect(0,0,W,H);
  const SANS='"Segoe UI",Roboto,Arial,sans-serif',MONO='"Courier New",monospace';let y=48;
- x.fillStyle='#0B0E17';x.font='bold 26px '+SANS;x.textAlign='center';x.fillText('DEAL Navotas',W/2,y);y+=26;x.font='15px '+SANS;x.fillStyle='#475569';x.fillText('Payment receipt',W/2,y);y+=18;
+ x.fillStyle='#0B0E17';x.font='bold 26px '+SANS;x.textAlign='center';x.fillText('DEAL Navotas',W/2,y);y+=26;x.font='15px '+SANS;x.fillStyle='#475569';x.fillText(pay&&pay.method==='cash'?'Claim slip (cash, unpaid)':'Payment receipt',W/2,y);y+=18;
  const line=()=>{x.strokeStyle='#cbd5e1';x.setLineDash([5,4]);x.beginPath();x.moveTo(32,y);x.lineTo(W-32,y);x.stroke();x.setLineDash([]);y+=26};
  const fit=(s,w)=>{s=String(s);while(s.length>1&&x.measureText(s).width>w)s=s.slice(0,-2)+'…';return s};
  const row=(l,v,b)=>{x.textAlign='left';x.fillStyle='#64748b';x.font='14px '+SANS;x.fillText(l,32,y);x.textAlign='right';x.fillStyle='#0B0E17';x.font=(b?'bold ':'')+'14px '+MONO;x.fillText(fit(v,W-64-190),W-32,y);y+=30};
  line();rows.forEach(r=>row(r[0],r[1]));line();items.forEach(r=>row(r[0],r[1]));
- x.textAlign='left';x.fillStyle='#0B0E17';x.font='bold 18px '+SANS;x.fillText('Total paid',32,y+4);x.textAlign='right';x.fillStyle='#059669';x.font='bold 22px '+MONO;x.fillText('₱'+fmt(total).replace(/^₱/,''),W-32,y+4);y+=34;
+ x.textAlign='left';x.fillStyle='#0B0E17';x.font='bold 18px '+SANS;x.fillText(pay&&pay.method==='cash'?'Total due at pickup':'Total paid',32,y+4);x.textAlign='right';x.fillStyle='#059669';x.font='bold 22px '+MONO;x.fillText('₱'+fmt(total).replace(/^₱/,''),W-32,y+4);y+=34;
  line();pr.forEach(r=>row(r[0],r[1]));y+=2;
  x.textAlign='center';x.fillStyle='#64748b';x.font='12px '+SANS;notes.forEach(n=>{x.fillText(n,W/2,y);y+=22});
  cv.toBlob(bl=>{if(!bl)return toast('Could not create the receipt.',1);const u=URL.createObjectURL(bl),a=document.createElement('a');a.href=u;a.download='receipt-'+p.id+'.png';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);toast('Receipt downloaded.')},'image/png')}
@@ -681,7 +681,7 @@ function dlReceipt(id){const p=(S.pass&&S.pass.id===id?S.pass:null)||S.passes.fi
 //-> Calls the Supabase claim_portion RPC, stores the returned escrow pass in state, reloads records, and redraws.
 async function doClaim(id,kg,pay){const lot=find(id),wasLast=!!lot&&+lot.tubs<=1&&kg>=open(lot)-1e-9;const{data,error}=await sb.rpc('claim_portion',{p_cid:id,p_kg:kg});if(error){toast(error.message,1);return false}
  if(pay&&data&&data.id)await paySave(data.id,pay);
- S.pm=null;S.pay=null;S.pass=data&&data.pass_token?{...data,pay,t:new Date(data.created_at).toLocaleString()}:null;await load(1);const nl=find(id);toast((pay?'Payment received. Escrow pass generated.':'Portion claimed.')+(wasLast&&nl&&soldOut(nl)?' This lot is now Sold out.':''));render();return true}
+ S.pm=null;S.pay=null;S.pass=data&&data.pass_token?{...data,pay,t:new Date(data.created_at).toLocaleString()}:null;await load(1);const nl=find(id);toast((pay&&pay.method==='cashless'?'Payment received. Escrow pass generated.':pay?'Portion claimed. Pay cash at pickup. Pass generated.':'Portion claimed.')+(wasLast&&nl&&soldOut(nl)?' This lot is now Sold out.':''));render();return true}
 
 // ---> broker winning-bid payment (cash / cashless demo) <---
 //-> Flow: When a broker wins an auction, a payment dialog offers Cash or Cashless (demo only). "Pay amount" records the payment and opens a receipt dialog with a downloadable PNG.
