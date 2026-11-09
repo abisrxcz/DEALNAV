@@ -246,6 +246,30 @@ select option:checked,select option:hover,select option:focus{background:#006878
 .pier-select option:checked,.pier-select option:hover,.pier-select option:focus{background:#5eead4 linear-gradient(#5eead4,#5eead4);color:#0B0E17}
 .dark select option,.dark select optgroup,.dark .inp option,.dark #tc option{background:#111827!important;color:#e2e8f0!important}
 .dark select option:checked,.dark select option:hover,.dark select option:focus,.dark .inp option:checked,.dark #tc option:checked{background:#5eead4 linear-gradient(#5eead4,#5eead4)!important;color:#0B0E17!important}
+/* Pier location select: readable in light mode (dark text on white), light text on dark in dark mode */
+select.pier-select{background-color:#fff!important;color:#0f172a!important}
+.pier-select option{background:#fff!important;color:#0f172a!important}
+.pier-select option:checked,.pier-select option:hover,.pier-select option:focus{background:#006878 linear-gradient(#006878,#006878)!important;color:#fff!important}
+.dark select.pier-select{background-color:#111827!important;color:#fff!important}
+.dark .pier-select option{background:#111827!important;color:#fff!important}
+.dark .pier-select option:checked,.dark .pier-select option:hover,.dark .pier-select option:focus{background:#5eead4 linear-gradient(#5eead4,#5eead4)!important;color:#0B0E17!important}
+/* Pre-login page: light theme (shown when dark mode is off) */
+.landing.lt{background:#f1f5f9;color:#0f172a}
+.landing.lt .lbg{background:linear-gradient(180deg,#d6eef3 0%,#f1f5f9 100%)!important}
+.landing.lt .lbg>img{opacity:.2}
+.landing.lt .lov{background:rgba(255,255,255,.72)}
+.landing.lt header{background:rgba(255,255,255,.78)}
+.landing.lt :is(.text-white,.text-slate-100,.text-slate-200,.text-slate-300){color:#0f172a}
+.landing.lt .text-slate-400{color:#475569}
+.landing.lt button.bg-\[\#0B4A5D\]{color:#fff}
+.landing.lt article{background:rgba(255,255,255,.85);border-color:#cbd5e1}
+.landing.lt article:hover,.landing.lt article:focus-visible{background:#d9f3ef!important;border-color:#006878!important}
+.landing.lt article:hover h2,.landing.lt article:focus-visible h2{color:#006878!important}
+.landing.lt .fish{color:#0e7490}.landing.lt .bub{border-color:rgba(11,74,93,.35)}
+.landing.lt .spk{background:#fff;color:#0B4A5D;border-color:#006878}.landing.lt .spk[aria-pressed=true]{background:#006878;color:#fff}
+.landing.lt .lth{background:#fff}.landing.lt .lth:hover{background:#e6f4f7}
+.landing:not(.lt) .lth{background:rgba(15,23,42,.6)}.landing:not(.lt) .lth:hover{background:rgba(255,255,255,.15)}
+.landing :where(.lth):focus-visible{outline:2px solid #5eead4}
 /* Contrast sweep: tints that had no dark-mode counterpart, and weak mid-tone text */
 .dark .bg-emerald-50{background:#064e3b}.dark .bg-yellow-50{background:#422006}.dark .bg-teal-50{background:#0f2f36}
 .dark .border-emerald-200{border-color:#059669}.dark .border-yellow-200{border-color:#b45309}.dark .border-teal-200{border-color:#0f766e}
@@ -1335,12 +1359,12 @@ const STAGE=`<div class="dstage"><div class="dtruck" aria-hidden="true"><div cla
 // ---> public landing page and sign-in entry point <---
 //-> Section: Introduces DEAL, its purpose and objectives; visitors can scroll the content or open the role-based sign-in dialog.
 let INTRO=false;
-const landing=()=>{const skip=INTRO;INTRO=true;return`<div class="landing relative min-h-screen overflow-x-clip text-white bg-[#0B0E17]">
-<div class="fixed inset-0 z-0 overflow-hidden" style="background:linear-gradient(180deg,#0B4A5D 0%,#062c3a 55%,#0B0E17 100%)">
+const landing=()=>{const skip=INTRO;INTRO=true;return`<div class="landing${S.dark?'':' lt'} relative min-h-screen overflow-x-clip text-white bg-[#0B0E17]">
+<div class="lbg fixed inset-0 z-0 overflow-hidden" style="background:linear-gradient(180deg,#0B4A5D 0%,#062c3a 55%,#0B0E17 100%)">
 <img src="landing-bg.gif" alt="" class="absolute inset-0 w-full h-full object-cover" onerror="this.remove()">
 <div class="absolute inset-0 pointer-events-none" aria-hidden="true">${[[10,70,18,.7],[26,46,26,.9],[44,90,14,.6],[60,58,22,.8],[76,36,30,.9],[88,80,16,.7]].map(([y,d,w,o],i)=>`<span class="fish" style="top:${y}%;width:${w*4}px;height:${w*2}px;animation-duration:${d}s;animation-delay:-${i*11}s;opacity:${o}">${FISH}</span>`).join('')}${[...Array(12)].map((_,i)=>`<span class="bub" style="left:${(i*83)%100}%;width:${8+(i*7)%14}px;height:${8+(i*7)%14}px;animation-duration:${9+(i*5)%9}s;animation-delay:-${i*2}s"></span>`).join('')}</div>
-<div class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"></div></div>
-<header class="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 bg-slate-950/50 backdrop-blur-md" style="padding-top:max(.75rem,env(safe-area-inset-top))"><div class="flex items-center gap-2"><img src="${LOGO}" alt="DEAL" class="h-11 w-11 object-contain"><span class="bg-[#04384b] border border-[#008fa8] text-[#00a8c6] text-[0.625rem] font-mono font-bold px-1.5 py-0.5 rounded-md">NAVOTAS</span><span class="hidden lg:block text-xs text-slate-400 ml-1">Digital Consignation System for Fisheries Trade</span></div><div class="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">${lg()}<button class="btn sign-white !w-auto !py-2.5 px-4 text-sm min-h-[40px]" ${SIGN}>🔑 Sign In</button></div></header>
+<div class="lov absolute inset-0 bg-slate-950/80 backdrop-blur-sm"></div></div>
+<header class="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 bg-slate-950/50 backdrop-blur-md" style="padding-top:max(.75rem,env(safe-area-inset-top))"><div class="flex items-center gap-2"><img src="${LOGO}" alt="DEAL" class="h-11 w-11 object-contain"><span class="bg-[#04384b] border border-[#008fa8] text-[#00a8c6] text-[0.625rem] font-mono font-bold px-1.5 py-0.5 rounded-md">NAVOTAS</span><span class="hidden lg:block text-xs text-slate-400 ml-1">Digital Consignation System for Fisheries Trade</span></div><div class="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">${lg()}<button type="button" onclick="S.dark=!S.dark;render()" class="lth h-11 w-11 shrink-0 rounded-lg border border-slate-400/60 text-xl leading-none" aria-label="${S.dark?'Switch to light mode':'Switch to dark mode'}" aria-pressed="${S.dark}">${S.dark?'☀️':'🌙'}</button><button class="btn sign-white !w-auto !py-2.5 px-4 text-sm min-h-[40px]" ${SIGN}>🔑 Sign In</button></div></header>
 <main class="relative z-10">
 <section class="relative min-h-[80vh] flex flex-col items-center justify-center text-center px-6 ${skip?'skip':''}">${STAGE}
 <p class="rv mt-4 max-w-xl text-lg sm:text-xl text-slate-100 drop-shadow-md">Digital Fish Distribution Platform for Consignation at Navotas Fish Port</p><p class="rv mt-10 text-sm text-slate-300">Scroll to learn more ↓</p></section>
