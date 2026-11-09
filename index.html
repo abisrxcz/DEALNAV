@@ -1433,6 +1433,9 @@ const ongoing=c=>!!c&&!c.closed&&!c.sold_out&&c.ongoing===true&&!taken(c);
 const offFloor=c=>fullyClaimed(c)||ongoing(c);
 const ONGMSG='A transaction on this lot is on-going. It can be claimed again once the cash pickup QR is scanned.';
 const soldOut=c=>fullyClaimed(c)&&!ongoing(c);
+/* vendor view: once the broker has scanned this vendor's QR pass, the vendor's part of the lot is sold out (even if other tubs are still open for others) */
+const vSold=(c,ps)=>!!c&&S.role==='vendor'&&(ps||histPasses()).some(p=>p.cid===c.id&&p.status==='released');
+const soldFor=(c,ps)=>soldOut(c)||vSold(c,ps);
 /* ===== Who is part of a lot's story: drives the Sold Out entry in each role's Sales History =====
    vendor  = claimed a portion of the lot (has a pass on it)
    broker  = won the auction (the buyer), or handles escrow passes on it
@@ -1452,18 +1455,18 @@ function myPart(c,ps){ps=ps||histPasses();if(!mine(c,ps))return'';const kg=myKg(
   if(S.role==='vendor')return kg?`You claimed ${kg} kg`:'You claimed a portion';
   if(S.role==='broker')return S.uid&&c.winner_id===S.uid?`You bought this lot at ${fmt(c.bid)}/kg`:`You handled ${kg} kg of vendor passes`;
   return'You logged this lot'}
-const lotTag=c=>c&&soldOut(c)?`<span class="badge ${c.closed?'bg-emerald-100 text-emerald-800':'bg-yellow-100 text-yellow-800'} h-fit">${c.closed?'Closed':'Sold out'}</span>`:c&&ongoing(c)?`<span class="badge bg-amber-100 text-amber-800 h-fit">On-going transaction</span>`:'';
+const lotTag=c=>c&&soldFor(c)?`<span class="badge ${c.closed?'bg-emerald-100 text-emerald-800':'bg-yellow-100 text-yellow-800'} h-fit">${c.closed?'Closed':'Sold out'}</span>`:c&&ongoing(c)?`<span class="badge bg-amber-100 text-amber-800 h-fit">On-going transaction</span>`:'';
 const histPasses=()=>{if(S.passes.length)return S.passes;try{return JSON.parse(localStorage.getItem('deal-hist-'+S.uid))||[]}catch(e){return[]}};
 const dtx=x=>x?new Date(x).toLocaleString():'—',tsn=x=>{const d=Date.parse(x);return isNaN(d)?0:d};
-const lotLast=(c,ps)=>Math.max(tsn(c.sold_out_at),tsn(lsMap(SEENK())[c.id]),tsn(c.settled_at),tsn(c.created_at),...ps.filter(p=>p.cid===c.id).map(p=>tsn(p.created_at)));
+const lotLast=(c,ps)=>Math.max(tsn(c.sold_out_at),tsn(lsMap(SEENK())[c.id]),tsn(c.settled_at),tsn(c.created_at),...ps.filter(p=>p.cid===c.id).map(p=>Math.max(tsn(p.created_at),tsn(p.scanned_at))));
 const HK={auction:['🏆 Auction closed','bg-teal-100 text-teal-800'],claim:['⚖️ Claimed & paid (escrow)','bg-yellow-100 text-yellow-800'],delivered:['✓ Delivered / pickup verified','bg-emerald-100 text-emerald-800'],sold:['📦 Sold out','bg-sky-100 text-sky-800'],logged:['📋 Logged at the pier','bg-teal-100 text-teal-800']};
 function histEvents(){const ps=histPasses(),ev=[],ck=S.role==='checker',lg=ck?loggedMap():{};
   S.catches.forEach(c=>{
    if(ck&&lg[c.id])ev.push({k:'logged',ts:lg[c.id].t||c.created_at,id:c.id,title:c.name,qty:`${c.kg} kg / tub`,price:+c.price,total:null,note:'Logged at the pier · '+(lg[c.id].res||'Recorded'),who:'You logged this lot'});
    if(c.settled_at&&c.winner_id)ev.push({k:'auction',ts:c.settled_at,id:c.id,title:c.name,qty:`${c.kg} kg / tub`,price:+c.price,total:null,note:'Winner '+bidder(c.winner_id,c.winner_ident)});
    /* sold out (all tubs taken) or closed: recorded for the vendor who claimed it, the broker who bought it and the checker who logged it */
-   if(soldOut(c)&&mine(c,ps)){const kg=myKg(c,ps);
-    ev.push({k:'sold',ts:new Date(lotLast(c,ps)).toISOString(),id:c.id,title:c.name,qty:S.role==='vendor'&&kg?`${kg} kg claimed by you`:`${c.kg} kg / tub`,price:+c.price,total:null,note:c.closed?'Closed · all escrow released':'Sold out · every tub claimed',who:myPart(c,ps)})}});
+   if(soldFor(c,ps)&&mine(c,ps)){const kg=myKg(c,ps);
+    ev.push({k:'sold',ts:new Date(lotLast(c,ps)).toISOString(),id:c.id,title:c.name,qty:S.role==='vendor'&&kg?`${kg} kg claimed by you`:`${c.kg} kg / tub`,price:+c.price,total:null,note:c.closed?'Closed · all escrow released':soldOut(c)?'Sold out · every tub claimed':'Sold out · QR pass scanned by the broker',who:myPart(c,ps)})}});
   ps.forEach(p=>{const lot=find(p.cid),pr=lot?+lot.price:null;
    ev.push({k:'claim',ts:p.created_at,id:p.id,ref:p.cid,title:p.name,qty:`${p.kg} kg`,price:pr,total:+p.total,note:p.status==='escrow'?((p.pay||payOf(p)||{}).method==='cashless'?'Paid online (cashless)':'Cash · waiting for the QR scan'):'Payment released'});
    if(p.status==='released')ev.push({k:'delivered',ts:p.scanned_at||p.created_at,id:p.id,ref:p.cid,title:p.name,qty:`${p.kg} kg`,price:pr,total:+p.total,note:p.scanned_at?'Verified by QR scan':'Released by broker'})});
@@ -1477,13 +1480,13 @@ function histV(){const all=histEvents(),ps=histPasses(),n=k=>all.filter(e=>e.k==
  +`<div class="flex gap-2 overflow-x-auto mb-4" role="group" aria-label="History filter">${pills.map(([k,t,c])=>`<button class="pill border ${HF===k?'on':''}" aria-pressed="${HF===k}" onclick="HF='${k}';render()">${t} · ${c}</button>`).join('')}</div>`
  +(l.length?l.map(e=>`<div class="card p-4 mb-3 flex flex-wrap justify-between gap-3 items-center"><div class="min-w-0"><span class="badge ${HK[e.k][1]}">${HK[e.k][0]}</span><div class="font-mono text-xs text-slate-500 mt-1">${e.id}${e.ref?' · '+e.ref:''}</div><b>${e.title}</b><div class="text-sm">${e.qty}${e.price!=null&&!isNaN(e.price)?' · '+fmt(e.price)+'/kg':''}</div><div class="text-xs text-slate-500">${e.note} · ${dtx(e.ts)}</div>${e.who?`<div class="text-xs font-semibold text-[#0B4A5D] mt-0.5">${e.who}</div>`:''}</div>${e.total!=null?`<div class="text-right"><div class="text-xs text-slate-500">Total</div><div class="font-mono font-bold text-lg">${fmt(e.total)}</div></div>`:''}</div>`).join(''):'<p class="text-slate-500">Nothing here yet. Auctions, claims, payments and deliveries appear as they happen.</p>')}
 const sfBar=()=>`<div class="mb-4 flex items-center gap-2 overflow-x-auto pb-1">${S.role==='vendor'?`<button type="button" class="pill border shrink-0" onclick="SF='all';S.tab='floor';render()">&larr; Fresh Catches</button>`:''}${[['all','All'],['ongoing','On-going'],['sold','Sold Out'],['closed','Closed']].map(([k,l])=>`<button type="button" class="pill border shrink-0 ${SF===k?'on':''}" aria-pressed="${SF===k}" onclick="SF='${k}';render()">${l}</button>`).join('')}</div>`;
-function soldV(){const ps=histPasses(),l=S.catches.filter(c=>fullyClaimed(c)||ongoing(c)).filter(c=>SF==='all'||(SF==='closed'?!!c.closed:SF==='ongoing'?ongoing(c):soldOut(c)&&!c.closed)).sort((a,b)=>lotLast(b,ps)-lotLast(a,ps));
+function soldV(){const ps=histPasses(),l=S.catches.filter(c=>fullyClaimed(c)||ongoing(c)||vSold(c,ps)).filter(c=>SF==='all'||(SF==='closed'?!!c.closed:SF==='ongoing'?ongoing(c)&&!vSold(c,ps):soldFor(c,ps)&&!c.closed)).sort((a,b)=>lotLast(b,ps)-lotLast(a,ps));
  return h1('Sold Out / Closed Catches',`${l.length} lot(s) sold out, closed or on-going. Fully claimed lots no longer appear on Fresh Catches.`)
  +sfBar()+`<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${l.map(c=>{const cp=ps.filter(p=>p.cid===c.id),held=cp.filter(p=>p.status==='escrow').length,kg=cp.reduce((a,p)=>a+(+p.kg||0),0);
   return`<div class="card overflow-hidden flex flex-col"><div class="h-24 bg-gradient-to-br from-[#0B4A5D] to-[#006878] p-3 flex justify-between"${c.photo?` style="background:url(${c.photo}) center/cover"`:''}><span></span><span class="font-mono text-xs text-white/80">${c.id}</span></div>
   <div class="p-4 flex flex-1 flex-col"><h3 class="font-semibold text-lg min-h-[3.5rem]">${c.name}</h3>
   <div class="flex justify-between items-end my-2"><span class="font-mono text-2xl font-bold">${fmt(c.price)}/kg</span><span class="text-sm font-mono">${c.kg} kg / tub</span></div>
-  <div class="text-xs text-slate-500">${lotTag(c)} ${c.closed?'All escrow released.':ongoing(c)?'Claiming is paused until the cash pickup QR is scanned.':held?held+' escrow pass(es) still held.':'Fully claimed and paid.'}</div>
+  <div class="text-xs text-slate-500">${lotTag(c)} ${c.closed?'All escrow released.':vSold(c,ps)&&!fullyClaimed(c)?'Your QR pass was scanned. Your portion is sold out.':ongoing(c)?'Claiming is paused until the cash pickup QR is scanned.':held?held+' escrow pass(es) still held.':'Fully claimed and paid.'}</div>
   ${kg?`<div class="text-xs text-slate-500">${kg} kg claimed in total</div>`:''}${myPart(c,ps)?`<div class="text-xs font-semibold text-[#0B4A5D] mt-1">${myPart(c,ps)}</div>`:''}${c.settled_at&&c.winner_id?`<div class="text-xs text-slate-500">Auction winner ${bidder(c.winner_id,c.winner_ident)}</div>`:''}
   <div class="text-xs text-slate-500">Last activity ${dtx(new Date(lotLast(c,ps)).toISOString())}</div>
   <div class="mt-auto pt-2 min-h-[1.75rem]">${c.verified?`<button class="text-xs text-[#006878] font-semibold" data-k="insp-${c.id}" onclick="run(this,'Loading photos…',()=>viewInsp('${c.id}'))">View inspection photos</button>`:''}</div></div></div>`}).join('')||'<p class="text-slate-500">No sold-out catches yet. A lot moves here once every portion is claimed.</p>'}</div>`}
