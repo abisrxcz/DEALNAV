@@ -1456,7 +1456,7 @@ const sfBar=()=>`<div class="mb-4 flex items-center gap-2 overflow-x-auto pb-1">
 function soldV(){const ps=histPasses(),l=S.catches.filter(c=>fullyClaimed(c)||ongoing(c)).filter(c=>SF==='all'||(SF==='closed'?!!c.closed:SF==='ongoing'?ongoing(c):soldOut(c)&&!c.closed)).sort((a,b)=>lotLast(b,ps)-lotLast(a,ps));
  return h1('Sold Out / Closed Catches',`${l.length} lot(s) sold out, closed or on-going. Fully claimed lots no longer appear on Fresh Catches.`)
  +sfBar()+`<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${l.map(c=>{const cp=ps.filter(p=>p.cid===c.id),held=cp.filter(p=>p.status==='escrow').length,kg=cp.reduce((a,p)=>a+(+p.kg||0),0);
-  return`<div class="card overflow-hidden flex flex-col"><div class="h-24 bg-gradient-to-br from-[#0B4A5D] to-[#006878] p-3 flex justify-between"${c.photo?` style="background:url(${c.photo}) center/cover"`:''}>${lotTag(c)||'<span></span>'}<span class="font-mono text-xs text-white/80">${c.id}</span></div>
+  return`<div class="card overflow-hidden flex flex-col"><div class="h-24 bg-gradient-to-br from-[#0B4A5D] to-[#006878] p-3 flex justify-between"${c.photo?` style="background:url(${c.photo}) center/cover"`:''}><span></span><span class="font-mono text-xs text-white/80">${c.id}</span></div>
   <div class="p-4 flex flex-1 flex-col"><h3 class="font-semibold text-lg min-h-[3.5rem]">${c.name}</h3>
   <div class="flex justify-between items-end my-2"><span class="font-mono text-2xl font-bold">${fmt(c.price)}/kg</span><span class="text-sm font-mono">${c.kg} kg / tub</span></div>
   <div class="text-xs text-slate-500">${lotTag(c)} ${c.closed?'All escrow released.':ongoing(c)?'Claiming is paused until the cash pickup QR is scanned.':held?held+' escrow pass(es) still held.':'Fully claimed and paid.'}</div>
