@@ -239,6 +239,13 @@ button.btn.sign-white:hover,button.btn.sign-white:focus-visible,button.btn.sign-
 #tc:hover{background-color:#0B4A5D}
 #tc option{background:#FFFFFF;color:#0f172a}
 .dark #tc option{background:#111827;color:#e2e8f0}
+/* Drop-down menus: every option, and the highlighted / chosen one, always contrasts with its background (light, dark and pier selects) */
+select option,select optgroup{background:#fff;color:#0f172a}
+select option:checked,select option:hover,select option:focus{background:#006878 linear-gradient(#006878,#006878);color:#fff}
+.pier-select option{background:#111827;color:#fff}
+.pier-select option:checked,.pier-select option:hover,.pier-select option:focus{background:#5eead4 linear-gradient(#5eead4,#5eead4);color:#0B0E17}
+.dark select option,.dark select optgroup,.dark .inp option,.dark #tc option{background:#111827!important;color:#e2e8f0!important}
+.dark select option:checked,.dark select option:hover,.dark select option:focus,.dark .inp option:checked,.dark #tc option:checked{background:#5eead4 linear-gradient(#5eead4,#5eead4)!important;color:#0B0E17!important}
 /* Contrast sweep: tints that had no dark-mode counterpart, and weak mid-tone text */
 .dark .bg-emerald-50{background:#064e3b}.dark .bg-yellow-50{background:#422006}.dark .bg-teal-50{background:#0f2f36}
 .dark .border-emerald-200{border-color:#059669}.dark .border-yellow-200{border-color:#b45309}.dark .border-teal-200{border-color:#0f766e}
