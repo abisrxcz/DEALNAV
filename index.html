@@ -1563,6 +1563,9 @@
     try { const l = accGet()._last; if (l && LBL0.includes(l)) LR = l } catch (e) { }
     //-> Function: LS(key, fallback)
     //-> Reads a JSON value from localStorage and returns the fallback when the item is missing or invalid.
+    /* One-time local clean-up: when DATA_EPOCH changes, every device drops its saved catches, queue, payment and history caches (accounts and display settings are kept). */
+    const DATA_EPOCH = 'reset-2026-11-a';
+    try { if (localStorage.getItem('deal-epoch') !== DATA_EPOCH) { Object.keys(localStorage).filter(k => /^(deal-cache|deal-q|deal-hist-|deal-pay-|deal-logged-|deal-soldseen-)/.test(k)).forEach(k => localStorage.removeItem(k)); localStorage.setItem('deal-epoch', DATA_EPOCH) } } catch (e) { }
     const LS = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch (e) { return d } };
     let S = { mute: localStorage.getItem('deal-mute') === '1', notes: [], unread: 0, uid: null, bids: [], live: 'off', bidIn: {}, lastLoad: 0, user: null, role: null, tab: 'floor', lang: 'EN', catches: LS('deal-cache', []), passes: [], queue: LS('deal-q', []), checks: [], sel: null, offline: false, dark: (localStorage.getItem('deal-dark') ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1' };
     //-> Function: save()
