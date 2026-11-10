@@ -1369,6 +1369,11 @@
       color: #fff
     }
 
+    /* Pre-login logo stays visible on the light background (same teal outline as the post-login header logo) */
+    .landing.lt .plogo {
+      filter: drop-shadow(0 0 1.5px #0b4a5d) drop-shadow(0 0 1px #0b4a5d)
+    }
+
     .landing.lt .lth {
       background: #fff
     }
@@ -1567,7 +1572,7 @@
     const DATA_EPOCH = 'reset-2026-11-a';
     try { if (localStorage.getItem('deal-epoch') !== DATA_EPOCH) { Object.keys(localStorage).filter(k => /^(deal-cache|deal-q|deal-hist-|deal-pay-|deal-logged-|deal-soldseen-)/.test(k)).forEach(k => localStorage.removeItem(k)); localStorage.setItem('deal-epoch', DATA_EPOCH) } } catch (e) { }
     const LS = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch (e) { return d } };
-    let S = { mute: localStorage.getItem('deal-mute') === '1', notes: [], unread: 0, uid: null, bids: [], live: 'off', bidIn: {}, lastLoad: 0, user: null, role: null, tab: 'floor', lang: 'EN', catches: LS('deal-cache', []), passes: [], queue: LS('deal-q', []), checks: [], sel: null, offline: false, dark: (localStorage.getItem('deal-dark') ?? (matchMedia('(prefers-color-scheme: dark)').matches ? '1' : '0')) === '1' };
+    let S = { mute: localStorage.getItem('deal-mute') === '1', notes: [], unread: 0, uid: null, bids: [], live: 'off', bidIn: {}, lastLoad: 0, user: null, role: null, tab: 'floor', lang: 'EN', catches: LS('deal-cache', []), passes: [], queue: LS('deal-q', []), checks: [], sel: null, offline: false, dark: localStorage.getItem('deal-dark') === '1' };
     //-> Function: save()
     //-> Stores the pending queue, language, theme, and catch cache in localStorage; catch photos are intentionally omitted.
     const save = () => { try { localStorage.setItem('deal-q', JSON.stringify(S.queue)); localStorage.setItem('deal-lang', JSON.stringify(S.lang)); localStorage.setItem('deal-dark', S.dark ? '1' : '0'); localStorage.setItem('deal-cache', JSON.stringify(S.catches.map(({ photo, ...r }) => r))) } catch (e) { } };
@@ -2745,7 +2750,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
 <img src="landing-bg.gif" alt="" class="absolute inset-0 w-full h-full object-cover" onerror="this.remove()">
 <div class="absolute inset-0 pointer-events-none" aria-hidden="true">${[[10, 70, 18, .7], [26, 46, 26, .9], [44, 90, 14, .6], [60, 58, 22, .8], [76, 36, 30, .9], [88, 80, 16, .7]].map(([y, d, w, o], i) => `<span class="fish" style="top:${y}%;width:${w * 4}px;height:${w * 2}px;animation-duration:${d}s;animation-delay:-${i * 11}s;opacity:${o}">${FISH}</span>`).join('')}${[...Array(12)].map((_, i) => `<span class="bub" style="left:${(i * 83) % 100}%;width:${8 + (i * 7) % 14}px;height:${8 + (i * 7) % 14}px;animation-duration:${9 + (i * 5) % 9}s;animation-delay:-${i * 2}s"></span>`).join('')}</div>
 <div class="lov absolute inset-0 bg-slate-950/80 backdrop-blur-sm"></div></div>
-<header class="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 bg-slate-950/50 backdrop-blur-md" style="padding-top:max(.75rem,env(safe-area-inset-top))"><div class="flex items-center gap-2"><img src="${LOGO}" alt="DEAL" class="h-11 w-11 object-contain"><span class="bg-[#04384b] border border-[#008fa8] text-[#00a8c6] text-[0.625rem] font-mono font-bold px-1.5 py-0.5 rounded-md">NAVOTAS</span><span class="hidden lg:block text-xs text-slate-400 ml-1">Digital Consignation System for Fisheries Trade</span></div><div class="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">${lg()}<button type="button" onclick="S.dark=!S.dark;render()" class="lth h-11 w-11 shrink-0 rounded-lg border border-slate-400/60 text-xl leading-none" aria-label="${S.dark ? 'Switch to light mode' : 'Switch to dark mode'}" aria-pressed="${S.dark}">${S.dark ? '☀️' : '🌙'}</button><button class="btn sign-white !w-auto !py-2.5 px-4 text-sm min-h-[40px]" ${SIGN}>🔑 Sign In</button></div></header>
+<header class="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 bg-slate-950/50 backdrop-blur-md" style="padding-top:max(.75rem,env(safe-area-inset-top))"><div class="flex items-center gap-2"><img src="${LOGO}" alt="DEAL" class="plogo h-11 w-11 object-contain"><span class="bg-[#04384b] border border-[#008fa8] text-[#00a8c6] text-[0.625rem] font-mono font-bold px-1.5 py-0.5 rounded-md">NAVOTAS</span><span class="hidden lg:block text-xs text-slate-400 ml-1">Digital Consignation System for Fisheries Trade</span></div><div class="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">${lg()}<button type="button" onclick="S.dark=!S.dark;render()" class="lth h-11 w-11 shrink-0 rounded-lg border border-slate-400/60 text-xl leading-none" aria-label="${S.dark ? 'Switch to light mode' : 'Switch to dark mode'}" aria-pressed="${S.dark}">${S.dark ? '☀️' : '🌙'}</button><button class="btn sign-white !w-auto !py-2.5 px-4 text-sm min-h-[40px]" ${SIGN}>🔑 Sign In</button></div></header>
 <main class="relative z-10">
 <section class="relative min-h-[80vh] flex flex-col items-center justify-center text-center px-6 ${skip ? 'skip' : ''}">${STAGE}
 <p class="rv mt-4 max-w-xl text-lg sm:text-xl text-slate-100 drop-shadow-md">Digital Fish Distribution Platform for Consignation at Navotas Fish Port</p><p class="rv mt-10 text-sm text-slate-300">Scroll to learn more ↓</p></section>
