@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="light">
 
 <head>
   <meta charset="utf-8">
@@ -17,7 +17,7 @@
       const VOL = { nav: .8, pick: .8, error: .8 }, GAP = { nav: 40, pick: 40, error: 150 };
       const CLICKABLE = 'button,a[href],summary,[role=button],[role=tab],.pill,[onclick]';
       /* Controls that only move you around, even when styled as primary buttons. */
-      const NAV_ONLY = /openSign|closeSign|startTour|tourGo|endTour|openScanner|closeScanner|scNext|showQr|toggleND|togSound|viewInsp|viewEv|editStart|relAsk/;
+      const NAV_ONLY = /openSign|closeSign|startTour|tourGo|endTour|openScanner|closeScanner|scNext|showQr|toggleND|togSound|viewInsp|viewEv|editStart|relAsk|logout|openOrderQrModal|closeOrderQrModal|dlOrderReceipt/;
       /* Controls that commit a choice, even when styled as secondary buttons. */
       const PICK = /raiseBid|claim|askDone\(true\)/;
       const ERR = /delQ/;
@@ -74,12 +74,29 @@
         play(final ? 'pick' : 'nav');
       }, true);
 
-      /* Synthesized two-note notification chime (A5 then E6). Silent when the sound toggle is off. */
-      let lastChime = -1e9;
+      /* Custom positive notification chime (/assets/aistudio/universfield-new-notification-09-352705_d6a99e9d.mp3) with Web Audio fallback. */
+      let lastChime = -1e9, chimeBuf = null, chimeLoading = false;
+      function loadChime() {
+        if (chimeBuf || chimeLoading || !ctx) return;
+        chimeLoading = true;
+        fetch('/assets/aistudio/universfield-new-notification-09-352705_d6a99e9d.mp3')
+          .then(r => r.ok ? r.arrayBuffer() : Promise.reject())
+          .then(ab => ctx.decodeAudioData(ab))
+          .then(buf => { chimeBuf = buf; })
+          .catch(() => { })
+          .finally(() => { chimeLoading = false; });
+      }
       function chime() {
         if (muted() || !init()) return;
         const now = performance.now(); if (now - lastChime < 350) return; lastChime = now;
         if (ctx.state !== 'running') ctx.resume().catch(() => { });
+        if (chimeBuf) {
+          const src = ctx.createBufferSource(), g = ctx.createGain();
+          src.buffer = chimeBuf; g.gain.value = .65;
+          src.connect(g); g.connect(ctx.destination); src.start();
+          return;
+        }
+        loadChime();
         const t0 = ctx.currentTime + .02;
         [[880, 0], [1318.5, .14]].forEach(([f, d]) => {
           const o = ctx.createOscillator(), g = ctx.createGain();
@@ -89,6 +106,7 @@
         });
       }
       init();
+      loadChime();
       return { play, unlock, chime };
     })();
     const playAudio = name => Snd.play(name), playChime = () => Snd.chime();
@@ -104,8 +122,8 @@
   <style type="text/tailwindcss">
     @layer components{
 .badge{@apply text-xs font-mono uppercase px-2 py-0.5 rounded font-semibold inline-block}
-.btn{@apply w-full rounded-xl bg-[#006878] hover:bg-[#0B4A5D] text-white font-semibold py-3 text-sm disabled:bg-slate-200 disabled:text-slate-700 disabled:cursor-not-allowed}
-.btn2{@apply rounded-xl border border-slate-300 bg-white font-semibold py-3 px-4 text-sm hover:bg-slate-50}
+.btn{@apply w-full sm:w-auto rounded-xl bg-[#006878] hover:bg-[#0B4A5D] text-white font-semibold py-2.5 px-4 max-h-12 text-sm inline-flex items-center justify-center gap-1.5 transition-colors disabled:bg-slate-200 disabled:text-slate-700 disabled:cursor-not-allowed}
+.btn2{@apply w-full sm:w-auto rounded-xl border border-slate-300 bg-white font-semibold py-2.5 px-4 max-h-12 text-sm inline-flex items-center justify-center gap-1.5 hover:bg-slate-50}
 .inp{@apply w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#006878]}
 .lbl{@apply block text-sm font-medium mb-1 mt-3}
 .card{@apply rounded-xl bg-white border border-slate-200 shadow-sm}
@@ -174,10 +192,13 @@
       background: #111827
     }
 
-    .dark .text-slate-500,
+    .dark .text-slate-500 {
+      color: #94a3b8
+    }
+
     .dark .text-slate-600,
     .dark .text-slate-700 {
-      color: #94a3b8
+      color: #cbd5e1
     }
 
     .dark .bg-teal-50 {
@@ -1403,8 +1424,22 @@
       background: #422006
     }
 
-    .dark .bg-teal-50 {
+    .dark .bg-teal-50,
+    .dark .bg-teal-50\/50,
+    .dark .bg-teal-50\/70 {
       background: #0f2f36
+    }
+
+    .dark .bg-indigo-100 {
+      background: #312e81
+    }
+
+    .dark .text-indigo-800 {
+      color: #c7d2fe
+    }
+
+    .dark .bg-slate-200 {
+      background: #334155
     }
 
     .dark .border-emerald-200 {
@@ -1415,7 +1450,16 @@
       border-color: #b45309
     }
 
-    .dark .border-teal-200 {
+    .dark .border-amber-300 {
+      border-color: #b45309
+    }
+
+    .dark .border-red-300 {
+      border-color: #b91c1c
+    }
+
+    .dark .border-teal-200,
+    .dark .border-teal-200\/80 {
       border-color: #0f766e
     }
 
@@ -1428,17 +1472,33 @@
       color: #a8b5c7
     }
 
+    .dark .text-slate-300 {
+      color: #64748b
+    }
+
     .dark .text-teal-700 {
       color: #5eead4
+    }
+
+    .dark .text-teal-900 {
+      color: #99f6e4
     }
 
     .dark .text-emerald-700 {
       color: #6ee7b7
     }
 
+    .dark .text-emerald-900 {
+      color: #a7f3d0
+    }
+
     .dark .text-amber-600,
     .dark .text-amber-700 {
       color: #fcd34d
+    }
+
+    .dark .text-amber-900 {
+      color: #fde68a
     }
 
     .dark .text-red-600,
@@ -1452,6 +1512,11 @@
 
     .dark .text-sky-700 {
       color: #7dd3fc
+    }
+
+    .qr-frame {
+      background: #ffffff !important;
+      border-color: #cbd5e1 !important
     }
 
     .text-emerald-600 {
@@ -1535,9 +1600,9 @@
     const $ = s => document.querySelector(s), fmt = n => '₱' + (+n).toLocaleString('en-PH', { maximumFractionDigits: 2 });
     const LBL0 = ['vendor', 'checker', 'broker'];
     const TABS = {
-      vendor: [['floor', 'Fresh Catches Floor'], ['taripa', 'Taripa Calculator'], ['quality', 'Suri-Isda Guard'], ['sync', 'Offline Sync'], ['passes', 'Passes & Ledger']],
-      checker: [['intake', 'Dockside Intake'], ['quality', 'Validation Register'], ['sync', 'Offline Sync'], ['sold', 'Sold Out / Closed']],
-      broker: [['auction', 'Consignations & Bids'], ['taripa', 'Taripa Calculator'], ['passes', 'Escrow & Passes'], ['sold', 'Sold Out / Closed']]
+      vendor: [['floor', 'Fresh Catches Floor'], ['taripa', 'Taripa Calculator'], ['sync', 'Offline Sync'], ['orders', 'Orders']],
+      checker: [['intake', 'Fish Log Floor'], ['quality', 'Validation Register'], ['sync', 'Offline Sync'], ['orders', 'Orders']],
+      broker: [['auction', 'Bidding Floor'], ['taripa', 'Taripa Calculator'], ['sync', 'Offline Sync'], ['orders', 'Orders']]
     };
     const TAG = { EN: 'Fresh fish, real opportunities', TL: 'Sariwang isda, tunay na oportunidad', TAGLISH: 'Fresh na isda, real na oportunidad' };
     let LR = 'vendor', CAT = 'All', HATI = false, HF = 'all', SQ = '', SF = 'all';
@@ -1556,7 +1621,7 @@
     const devLabel = () => { const u = navigator.userAgent || '', os = /Android/.test(u) ? 'Android' : /iPhone|iPad|iPod/.test(u) ? 'iOS' : /Windows/.test(u) ? 'Windows' : /Mac/.test(u) ? 'macOS' : /Linux/.test(u) ? 'Linux' : 'Device', br = /Edg\//.test(u) ? 'Edge' : /Chrome\//.test(u) ? 'Chrome' : /Firefox\//.test(u) ? 'Firefox' : /Safari\//.test(u) ? 'Safari' : 'Browser'; return os + ' / ' + br };
     async function devSync(want) { if (!sb) return; const id = devId(); if (want && S.rem === false) await sb.rpc('forget_device', { p_device: id }); else if (want) await sb.rpc('remember_device', { p_device: id, p_label: devLabel() }); else await sb.rpc('touch_device', { p_device: id }) }
     let prefSnap = '', prefT;
-    async function prefsPull() { const { data } = await sb.from('user_prefs').select('lang,dark,mute,tutorial_done').maybeSingle(); prefSnap = ''; if (!data) return; if (['EN', 'TL', 'TAGLISH'].includes(data.lang)) S.lang = data.lang; if (typeof data.dark === 'boolean') S.dark = data.dark; if (typeof data.mute === 'boolean') S.mute = data.mute; if (data.tutorial_done && S.uid) tutDone(S.uid); prefSnap = JSON.stringify([S.lang, S.dark, S.mute]) }
+    async function prefsPull() { const { data } = await sb.from('user_prefs').select('lang,dark,mute,tutorial_done').maybeSingle(); prefSnap = ''; if (!data) return; if (['EN', 'TL', 'TAGLISH'].includes(data.lang)) S.lang = data.lang; if (typeof data.mute === 'boolean') S.mute = data.mute; if (data.tutorial_done && S.uid) tutDone(S.uid); prefSnap = JSON.stringify([S.lang, S.dark, S.mute]) }
     function prefsPush() { if (!sb || !S.user || !S.loaded) return; const s = JSON.stringify([S.lang, S.dark, S.mute]); if (s === prefSnap) return; clearTimeout(prefT); prefT = setTimeout(async () => { try { const { error } = await sb.rpc('save_prefs', { p_lang: S.lang, p_dark: S.dark, p_mute: S.mute }); if (!error) prefSnap = s } catch (e) { } }, 800) }
     /* ===== Saved accounts (this device only) =====
        Stores role + ID (never the password) so the sign-in form is prefilled next time.
@@ -1572,7 +1637,7 @@
     const DATA_EPOCH = 'reset-2026-11-a';
     try { if (localStorage.getItem('deal-epoch') !== DATA_EPOCH) { Object.keys(localStorage).filter(k => /^(deal-cache|deal-q|deal-hist-|deal-pay-|deal-logged-|deal-soldseen-)/.test(k)).forEach(k => localStorage.removeItem(k)); localStorage.setItem('deal-epoch', DATA_EPOCH) } } catch (e) { }
     const LS = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch (e) { return d } };
-    let S = { mute: localStorage.getItem('deal-mute') === '1', notes: [], unread: 0, uid: null, bids: [], live: 'off', bidIn: {}, lastLoad: 0, user: null, role: null, tab: 'floor', lang: 'EN', catches: LS('deal-cache', []), passes: [], queue: LS('deal-q', []), checks: [], sel: null, offline: false, dark: localStorage.getItem('deal-dark') === '1' };
+    let S = { mute: localStorage.getItem('deal-mute') === '1', notes: [], unread: 0, uid: null, bids: [], live: 'off', bidIn: {}, lastLoad: 0, user: null, role: null, tab: 'floor', lang: 'EN', catches: LS('deal-cache', []), passes: [], queue: LS('deal-q', []), checks: [], sel: null, offline: false, dark: false };
     //-> Function: save()
     //-> Stores the pending queue, language, theme, and catch cache in localStorage; catch photos are intentionally omitted.
     const save = () => { try { localStorage.setItem('deal-q', JSON.stringify(S.queue)); localStorage.setItem('deal-lang', JSON.stringify(S.lang)); localStorage.setItem('deal-dark', S.dark ? '1' : '0'); localStorage.setItem('deal-cache', JSON.stringify(S.catches.map(({ photo, ...r }) => r))) } catch (e) { } };
@@ -1582,13 +1647,26 @@
     const find = id => S.catches.find(c => c.id === id);
     const open = c => c.kg - c.claimed;
     /* A finished tub rolls into the next one (same rule as the database trigger), so open kg and tubs are always per current tub. */
-    const normLot = x => { const kg = +x.kg; if (x.tubs != null && kg > 0) { let t = +x.tubs, cl = +x.claimed || 0; while (cl >= kg - 1e-9 && t > 1) { t--; cl -= kg } x.tubs = t; x.claimed = cl } return x };
+    const normLot = x => { const kg = +x.kg; if (x.tubs != null && kg > 0) { let t = +x.tubs, cl = +x.claimed || 0; while (cl >= kg - 1e-9 && t > 1) { t--; cl -= kg } x.tubs = t; x.claimed = cl } if (x.total_tubs == null) x.total_tubs = +x.tubs || 0; if (x.remaining_tubs == null) x.remaining_tubs = (x.closed || x.sold_out) ? 0 : (+x.tubs <= 1 && +x.claimed >= +x.kg - 1e-9) ? 0 : Math.max(0, +x.tubs || 0); return x };
     const pmLastTxt = (c, k) => { if (!(k >= open(c) - 1e-9)) return ''; return +c.tubs <= 1 ? 'This takes the last of the stock. The lot will be marked Sold out.' : 'This completes the tub. The next tub opens for claiming.' };
     function pmLast(c, k) { const e = $('#pmlast'); if (!e) return; const t = pmLastTxt(c, k); e.textContent = t; e.classList.toggle('hidden', !t) }
     //-> Function: tar(pricePerKg, kilograms)
     //-> Calculates base price, port fee, 5% commission, ice/handling, total payable, and effective cost per kg.
     const tar = (p, kg) => { const base = p * kg, port = 2.5 * kg, comm = base * .05, ice = 1.5 * kg, total = base + port + comm + ice; return { base, port, comm, ice, total, eff: kg ? total / kg : 0 } };
-    function toast(m, bad, q) { if (/failed to fetch|networkerror|load failed/i.test(m)) m = 'Network problem. Check your connection and try again.'; const d = document.createElement('div'); d.className = 'px-4 py-2 rounded-lg text-sm text-white shadow ' + (bad ? 'bg-red-600' : 'bg-[#0B4A5D]'); d.textContent = tr(m); $('#toast').append(d); if (!q && bad) playAudio('error'); setTimeout(() => d.remove(), bad ? 6500 : 3500) }
+    const TOAST_ACTIVE = new Map();
+    function toast(m, bad, q) {
+      if (/failed to fetch|networkerror|load failed/i.test(m)) m = 'Network problem. Check your connection and try again.';
+      const txt = tr(m), key = (bad ? '1|' : '0|') + txt, now = Date.now();
+      if (TOAST_ACTIVE.has(key) && now - TOAST_ACTIVE.get(key) < 3500) return;
+      TOAST_ACTIVE.set(key, now);
+      const d = document.createElement('div');
+      d.className = 'px-4 py-2 rounded-lg text-sm text-white shadow ' + (bad ? 'bg-red-600' : 'bg-[#0B4A5D]');
+      d.textContent = txt;
+      $('#toast').append(d);
+      if (!q && bad) playAudio('error');
+      const ttl = bad ? 6500 : 3500;
+      setTimeout(() => { d.remove(); if (TOAST_ACTIVE.get(key) === now) TOAST_ACTIVE.delete(key); }, ttl);
+    }
     const vl = id => ($('#' + id) || {}).value || '';
 
     // ---> sign-in and account access <---
@@ -1618,7 +1696,7 @@
  <div class="grid grid-cols-3 gap-1 bg-slate-100 border border-slate-300 p-1 rounded-xl my-4" role="tablist">${[['vendor', 'Micro-Vendor'], ['checker', 'Pier Checker'], ['broker', 'Consignee Broker']].map(([r, l]) => `<button onclick="LR='${r}';paintSign()" role="tab" aria-selected="${LR === r}" class="py-2 rounded-lg text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-[#006878] ${LR === r ? 'bg-[#006878] text-white' : ''}">${l}</button>`).join('')}</div>
  ${sb ? '' : '<p class="text-sm bg-amber-50 border border-amber-300 rounded-lg p-3">Setup needed: add your Supabase URL and anon key to config.js.</p>'}
  ${AM === 'up' && LR !== 'vendor' ? `<label class="lbl">Full name</label><input id="f0" class="inp" maxlength="80" autocomplete="name"><p class="text-xs text-slate-500 mt-2">We will create your ID for you when you finish.</p>` : `${AM === 'up' ? `<label class="lbl">Full name</label><input id="f0" class="inp" maxlength="80" autocomplete="name" placeholder="e.g. Juan Dela Cruz">` : ''}<label class="lbl">${LBL[LR][0]}</label><input id="f1" class="inp" placeholder="${LBL[LR][1]}" autocomplete="username" ${SAVED && AM === 'in' && !S.diff ? `value="${esc(SAVED.ident)}"` : ''}>${SAVED && AM === 'in' ? `<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mt-2 text-xs"><span class="text-slate-600">${S.diff ? 'Using a different account' : 'Saved account on this device'}</span><span class="flex gap-3">${S.diff ? `<button type="button" class="font-semibold text-[#006878] underline" onclick="S.diff=false;S.accRev=(S.accRev||0)+1;paintSign()">Use saved account</button>` : `<button type="button" class="font-semibold text-[#006878] underline" onclick="S.diff=true;S.accRev=(S.accRev||0)+1;paintSign()">Use a different account</button>`}<button type="button" class="font-semibold text-[#006878] underline" onclick="accForget(LR)">Forget</button></span></div>` : ''}`}
- <label class="lbl">Password</label><input id="f2" type="password" class="inp" autocomplete="${AM === 'up' ? 'new-password' : 'current-password'}" placeholder="${AM === 'up' ? '8+ characters, letters and numbers' : ''}">
+ <label class="lbl">Password</label><div class="relative"><input id="f2" type="password" class="inp !pr-11" autocomplete="${AM === 'up' ? 'new-password' : 'current-password'}" placeholder="${AM === 'up' ? '8+ characters, letters and numbers' : ''}"><button type="button" onclick="togglePw('f2',this)" aria-label="Show password" aria-pressed="false" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-500 hover:text-[#006878]" title="Show/hide password"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
  ${AM === 'up' && LR !== 'vendor' ? `<label class="lbl">${LR === 'checker' ? 'Assigned Dockside Pier Station' : 'Pier Location'}</label><select id="f3" class="inp pier-select">${PIERS.map(x => `<option>${x}</option>`).join('')}</select>` : ''}
  
  ${AM === 'up' && LR !== 'vendor' ? `<label class="lbl">Mobile Phone Number (optional)</label><input id="f5" class="inp" placeholder="09XX-XXX-XXXX" autocomplete="tel">` : ''}
@@ -1628,9 +1706,20 @@
  <div class="mt-2"><label class="flex items-start gap-2 text-sm"><input id="t2" type="checkbox" required aria-required="true" aria-invalid="false" aria-describedby="t2e" class="h-4 w-4 mt-0.5 shrink-0 accent-[#006878]" onchange="this.dataset.t='1';signChk()"><span><span>I accept the</span> <a href="${LEGAL.privacy}" target="_blank" rel="noopener" class="underline font-semibold text-[#006878]">Privacy Policy</a><span class="text-red-600" aria-hidden="true"> *</span></span></label><p id="t2e" class="hidden text-xs text-red-600 mt-1 ml-6" role="alert"></p></div>
  <p id="tcHint" class="text-xs text-slate-500 mt-2" aria-live="polite">Check both boxes to enable Create Account.</p></fieldset>`: ''}
  <div class="text-xs text-[#006878] flex justify-center my-3 font-medium"><span>Auto sign-out after 15 min idle</span></div>
- <button class="btn" data-k="login" ${AM === 'up' ? 'disabled aria-disabled="true"' : ''} onclick="run(this,'${AM === 'in' ? 'Signing in…' : 'Creating account…'}',doLogin)">${AM === 'in' ? { vendor: 'ENTER MICRO-VENDOR PORTAL', checker: 'ENTER PIER CHECKER PORTAL', broker: 'ENTER BROKER PORTAL' }[LR] : 'CREATE ACCOUNT'}</button>
+ <button class="btn !w-full" data-k="login" ${AM === 'up' ? 'disabled aria-disabled="true"' : ''} onclick="run(this,'${AM === 'in' ? 'Signing in…' : 'Creating account…'}',doLogin)">${AM === 'in' ? { vendor: 'ENTER MICRO-VENDOR PORTAL', checker: 'ENTER PIER CHECKER PORTAL', broker: 'ENTER BROKER PORTAL' }[LR] : 'CREATE ACCOUNT'}</button>
  
  <button class="w-full text-sm text-[#006878] font-semibold mt-3" onclick="AM=AM==='in'?'up':'in';paintSign()">${AM === 'in' ? 'New here? Create an account' : 'Have an account? Sign in'}</button></div></div>`
+    }
+    function togglePw(id, btn) {
+      const inp = $('#' + id); if (!inp) return;
+      const show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+      btn.setAttribute('aria-label', tr(show ? 'Hide password' : 'Show password'));
+      btn.innerHTML = show
+        ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+      playAudio('nav');
     }
     //-> Function: doLogin()
     //-> Validates the selected role's identifier and password, then signs in or registers through Supabase.
@@ -1686,11 +1775,20 @@
       const { data: { user } } = await sb.auth.getUser(); if (!user) return false;
       const { data: p } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (!p || !p.approved || (want && p.role !== want)) { await sb.auth.signOut(); toast(!p ? 'No profile found for this account.' : !p.approved ? 'Account is awaiting admin approval.' : 'This account is not registered for this portal.', 1); return false }
-      if (want && S.rem !== false) accSave(p.role, p.ident); S.user = p.ident; S.name = p.full_name || p.name || p.ident; S.avatar = p.avatar_url || p.avatar || null; S.uid = user.id; S.role = p.role; S.tutDue = tutDueFor(user.id); S.station = p.station || 'Pier 1-3'; S.tab = TABS[p.role][0][0];
+      if (want && S.rem !== false) accSave(p.role, p.ident); if (want) S.dark = false; S.user = p.ident; S.name = p.full_name || p.name || p.ident; S.avatar = p.avatar_url || p.avatar || null; S.uid = user.id; S.role = p.role; S.tutDue = tutDueFor(user.id); S.station = p.station || 'Pier 1-3'; S.tab = TABS[p.role][0][0];
       try { await devSync(!!want); await prefsPull(); S.tutDue = tutDueFor(user.id) } catch (e) { }
       await load(1); ch = sb.channel('deal').on('postgres_changes', { event: '*', schema: 'public' }, () => load(1)).subscribe(liveStatus); startAuctionLoops(); bump(); render(); return true
     }
-    async function logout() { S.lang = 'EN'; closeScanner(); S.pm = null; S.pay = null; S.pass = null; S.bp = null; S.br = null; try { await sb.auth.signOut(); if (ch) sb.removeChannel(ch) } catch (e) { } stopAuctionLoops(); SQ = ''; SF = 'all'; S.name = null; S.user = null; S.uid = null; S.live = 'off'; S.bids = []; S.catches = []; S.passes = []; S.checks = []; render() }
+    async function logout() { S.lang = 'EN'; S.dark = false; closeScanner(); S.pm = null; S.pay = null; S.pass = null; S.bp = null; S.br = null; try { await sb.auth.signOut(); if (ch) sb.removeChannel(ch) } catch (e) { } stopAuctionLoops(); SQ = ''; SF = 'all'; S.name = null; S.user = null; S.uid = null; S.live = 'off'; S.bids = []; S.catches = []; S.passes = []; S.checks = []; render() }
+    addEventListener('storage', async e => {
+      if (e.key && /^sb-.*-auth-token/.test(e.key) && S.uid) {
+        try {
+          const { data: { user } } = await sb.auth.getUser();
+          if (!user) { await logout(); toast('Signed out in another tab.', 1); }
+          else if (user.id !== S.uid) { await enter(); toast('Active account switched in another tab.', 1); }
+        } catch (err) { }
+      }
+    });
     const bump = () => { clearTimeout(idle); if (S.user) idle = setTimeout(async () => { await logout(); toast('Signed out after 15 minutes idle.') }, 9e5) };
     ['click', 'keydown', 'touchstart'].forEach(e => addEventListener(e, bump, { passive: true }));
     //-> Function: load(force)
@@ -1710,16 +1808,22 @@
       if (S.role === 'checker') { const m = lsMap(LOGK()); let ch = 0; S.checks.forEach(k => { if (k.by === S.user && (!m[k.id] || m[k.id].res !== k.res || !m[k.id].t)) { m[k.id] = { t: k.iso, res: k.res, name: k.name }; ch = 1 } }); if (ch) lsSet(LOGK(), m) }
       if (S.loaded) for (const x of S.catches) {
         const o = old[x.id]; if (!o) continue;
-        if (!ongoing(o) && ongoing(x) && offFloor(x)) note('On-going transaction', `${x.id} has an on-going transaction. Claiming reopens once the cash pickup QR is scanned.`);
+        if (!ongoing(o) && ongoing(x) && offFloor(x)) noteFor(['broker', 'vendor'], 'On-going transaction', `${x.id} has an on-going transaction. Claiming reopens once the cash pickup QR is scanned.`);
         if (!soldOut(o) && soldOut(x)) {
           if (!x.sold_out_at) { const m = lsMap(SEENK()); if (!m[x.id]) { m[x.id] = new Date().toISOString(); lsSet(SEENK(), m) } }
-          note('Sold out', mine(x) ? `${x.id} is sold out and added to your Sales History.` : `${x.id} is fully claimed and moved to Sold Out / Closed Catches.`)
+          noteFor(['broker', 'vendor', 'checker'], 'Sold out', mine(x) ? `${x.id} is sold out and added to your Sales History.` : `${x.id} is fully claimed and moved to Sold Out / Closed Catches.`)
         }
         /* the database says who holds each bid, so the alerts are exact: no guessing, no false alarms from your own raise */
-        if (S.role === 'broker' && x.bid > o.bid && x.bid_by !== S.uid) note(o.bid_by === S.uid ? 'You were outbid' : 'New higher bid', `${x.id} · ${fmt(x.bid)}/kg`);
-        if (x.settled_at && !o.settled_at) { if (S.role === 'broker') { note(x.winner_id === S.uid ? 'You won the auction' : 'Auction closed', `${x.id} · ${fmt(x.bid)}/kg`); if (bpDue(x) && bpBusyFree()) { S.sel = x.id; S.bp = { id: x.id, method: 'cash' } } } else if (S.role === 'vendor' && x.winner_id) note('Auction closed', `${x.id} is open to claim at ${fmt(x.price)}/kg.`) }
-        if (!o.verified && x.verified) note('Inspection update', `${x.id} passed Suri-Isda.`); if (o.verified && !x.verified) note('Inspection update', `${x.id} flagged for review.`)
+        if (S.role === 'broker' && x.bid > o.bid && x.bid_by !== S.uid) noteFor(['broker'], o.bid_by === S.uid ? 'You were outbid' : 'New higher bid', `${x.id} · ${fmt(x.bid)}/kg`);
+        if (x.settled_at && !o.settled_at) {
+          if (S.role === 'broker') { if (x.winner_id === S.uid) playChime(); noteFor(['broker'], x.winner_id === S.uid ? 'You won the auction' : 'Auction closed', `${x.id} · ${fmt(x.bid)}/kg`); if (bpDue(x) && bpBusyFree()) { S.sel = x.id; S.bp = { id: x.id, method: 'cash' } } }
+          else if (S.role === 'checker' && x.winner_id) noteFor(['checker'], 'Winning Bid Needs Approval', `${x.id} won at ${fmt(x.bid)}/kg. Review in Orders.`);
+          else if (S.role === 'vendor' && x.winner_id) noteFor(['vendor'], 'Auction closed', `${x.id} is open to claim at ${fmt(x.price)}/kg.`)
+        }
+        if (!o.verified && x.verified) noteFor(['checker', 'broker'], 'Inspection update', `${x.id} passed Suri-Isda.`); if (o.verified && !x.verified) noteFor(['checker', 'broker'], 'Inspection update', `${x.id} flagged for review.`)
       }
+      if (typeof syncPierAcquisitions === 'function') syncPierAcquisitions(S.catches, S.loaded);
+      if (typeof syncVendorOrdersFromPasses === 'function') syncVendorOrdersFromPasses(S.passes);
       S.loaded = 1; S.upd = new Date().toLocaleTimeString(); S.lastLoad = Date.now();
       if (!find(S.sel)) S.sel = S.catches[0] && S.catches[0].id;
       if (!q || (!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && !(S.role === 'checker' && S.tab === 'intake'))) render();
@@ -1863,38 +1967,40 @@
 <div class="flex items-center gap-2 min-w-0"><img src="${LOGO}" alt="" class="h-8 w-8 shrink-0 object-contain [filter:drop-shadow(0_0_1.5px_#0b4a5d)]"><span class="font-mono font-bold text-2xl text-[#0B4A5D]">DEAL</span>${S.user ? `<div class="hidden sm:block leading-tight border-l pl-3 ml-1 min-w-0"><b class="bebas text-xl block truncate">${rl}</b><span class="text-slate-500 text-xs block truncate">${S.user} · ${S.station}</span></div>` : `<span class="hidden sm:inline text-xs text-slate-500">NAVOTAS</span>`}</div>
 ${S.user ? `<div class="flex items-center gap-2 shrink-0" role="toolbar" aria-label="Header controls"><button data-k="refresh" onclick="run(this,'',()=>load(1))" class="btn2 !px-3 !py-2 text-sm" aria-label="Refresh data" title="${S.upd ? 'Updated ' + S.upd : 'Refresh'}">↻</button><button data-restore="notif" onclick="toggleND()" class="btn2 relative !px-3 !py-2" aria-label="Notifications${S.unread ? ' (' + S.unread + ' unread)' : ''}" aria-haspopup="dialog">🔔${S.unread ? `<span class="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[0.625rem] font-bold rounded-full px-1.5 min-w-[18px]">${S.unread}</span>` : ''}</button><button type="button" data-restore="profile" class="hdr-av rounded-full" onclick="S.sb=true;render()" aria-haspopup="dialog" aria-label="Open profile and menu: ${esc(profileView().name)}" title="${esc(profileView().name)}">${avatarEl(profileView(), 'sm')}</button></div>` : `<span class="text-sm text-slate-500 hidden sm:block">Digital Consignation System for Fisheries Trade</span><div class="flex gap-2 items-center">${dm()}${lg()}</div>`}</div></header>`
     }
-    function nav() { const t = TABS[S.role]; return `<nav class="bg-white border-b" aria-label="Main navigation"><div class="max-w-6xl mx-auto p-1.5 sm:p-2 grid gap-1 sm:gap-2 overflow-x-auto" style="grid-template-columns:repeat(${t.length},minmax(${t.length > 5 ? '5.6rem' : '0'},1fr))" role="tablist" aria-label="Sections">${t.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" class="nvt pill ${S.tab === k ? 'on' : ''}" onclick="S.tab='${k}';SF='all';render()"><span>${l}</span>${k === 'sync' && S.queue.length ? `<span class="nvq" aria-label="${S.queue.length} pending">${S.queue.length}</span>` : ''}</button>`).join('')}</div></nav>` }
+    function nav() { const t = TABS[S.role], oc = typeof orderAttentionCount === 'function' ? orderAttentionCount() : 0; return `<nav class="bg-white border-b" aria-label="Main navigation"><div class="max-w-6xl mx-auto p-1.5 sm:p-2 grid gap-1 sm:gap-2 overflow-x-auto" style="grid-template-columns:repeat(${t.length},minmax(${t.length > 5 ? '5.6rem' : '0'},1fr))" role="tablist" aria-label="Sections">${t.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" class="nvt pill ${S.tab === k ? 'on' : ''}" onclick="S.tab='${k}';SF='all';render()"><span>${l}</span>${k === 'sync' && S.queue.length ? `<span class="nvq" aria-label="${S.queue.length} pending">${S.queue.length}</span>` : k === 'orders' && oc ? `<span class="nvq" aria-label="${oc} active orders">${oc}</span>` : ''}</button>`).join('')}</div></nav>` }
     function navFix() { const a = document.querySelector('nav [aria-selected=true]'); if (a && a.scrollIntoView) a.scrollIntoView({ block: 'nearest', inline: 'nearest' }) }
     //-> Function: closeSb()
     //-> Closes the sidebar, re-renders the workspace, and restores focus to the control that opened the menu.
     function closeSb() { S.sb = false; render(); restoreFocus() }
     const bottom = () => '';
     /* Page titles get a photo banner (dark overlay, Bebas Neue) like Fresh Catches. */
-    const BNR = { 'Taripa Calculator': 'taripa', 'Suri-Isda Quality Guard': 'quality', 'Offline Sync Engine': 'sync', 'My Passes & Ledger': 'passes', 'Dockside Intake & Inspection': 'floor', 'Validation Register': 'quality', 'Consignations & Live Bids': 'floor', 'Transaction / Sales History': 'passes', 'Sold Out / Closed Catches': 'floor', 'No catches yet': 'reef' };
+    const BNR = { 'Orders': 'passes', 'Bidding Floor': 'floor', 'Fish Log Floor': 'floor', 'Fresh Catches Floor': 'floor', 'Taripa Calculator': 'taripa', 'Suri-Isda Quality Guard': 'quality', 'Offline Sync Engine': 'sync', 'My Passes & Ledger': 'passes', 'Dockside Intake & Inspection': 'floor', 'Validation Register': 'quality', 'Consignations & Live Bids': 'floor', 'Transaction / Sales History': 'passes', 'Sold Out / Closed Catches': 'floor', 'No catches yet': 'reef' };
     const h1 = (a, b) => { const i = BNR[a]; return i ? `<section class="ni-${i} relative overflow-hidden rounded-2xl mb-4 bg-cover bg-center" style="background-size:cover;background-position:center"><span class="absolute inset-0 bg-black/55" aria-hidden="true"></span><div class="relative z-10 p-5 sm:p-8 text-white text-left"><h1 class="text-4xl sm:text-5xl text-white">${a}</h1><p class="sub-inter mt-1 text-base sm:text-xl text-white max-w-2xl">${b}</p></div></section>` : `<div class="mb-4"><h1 class="font-mono font-bold text-2xl">${a}</h1><p class="sub-inter text-sm text-slate-600">${b}</p></div>` };
 
     // ---> fresh catches floor and vendor cards <---
     //-> Section: Browse catch lots by category, inspect available quantities and prices, then open a claim from a lot card.
     //-> Controls: Category buttons and Hati-Hati Banyera update the displayed catch list.
     function cardC(c, vend) {
-      const so = soldOut(c), o = so ? 0 : open(c), p = so ? 100 : c.claimed / c.kg * 100, ab = !c.settled_at && !!c.auction_ends && !so, pt = so ? myPart(c) : '';
+      const remTubs = remainingTubs(c), so = soldOut(c), o = so ? 0 : open(c), p = so ? 100 : c.claimed / c.kg * 100, ab = !c.settled_at && !!c.auction_ends && !so, pt = so ? myPart(c) : '';
       return `<article tabindex="0" class="card overflow-hidden flex flex-col${so ? ' opacity-80' : ''}" aria-label="${c.name}"><div class="h-44 bg-gradient-to-br from-[#0B4A5D] to-[#006878] p-3 flex justify-between"${c.photo ? ` style="background:url(${c.photo}) center/cover"` : ''}><span class="badge bg-sky-100 text-sky-800 h-fit">${c.fresh ? c.fresh + '/10 Fresh' : 'Not yet scored'}</span><span class="font-mono text-xs text-white/80">${c.id}</span></div>
 <div class="p-4 flex flex-1 flex-col"><div class="flex justify-between"><span class="badge ${c.verified ? 'bg-teal-100 text-teal-800' : 'bg-yellow-100 text-yellow-800'}">${c.verified ? 'Suri-Isda verified' : 'Pending audit'}</span>${lotTag(c)}</div>
 <div class="font-mono text-xs text-slate-400 mt-2 tracking-wide">${c.id}</div>
 <h3 class="font-bold text-3xl leading-tight mt-0.5 min-h-0">${c.name}</h3>
-<div class="flex justify-between items-end mt-0 mb-2"><div><span class="font-mono text-2xl font-bold">${fmt(c.price)}/kg</span><div class="text-xs text-slate-500 min-h-[0rem]">${c.src}</div></div><div class="text-right text-sm font-mono">${c.kg} kg / tub<br><span class="text-slate-500 text-xs">${so ? 0 : c.tubs} tubs available</span></div></div>
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2 mt-0 mb-2"><div><span class="font-mono text-2xl font-bold">${fmt(c.price)}/kg</span><div class="text-xs text-slate-500 min-h-[0rem]">${c.src}</div></div><div class="sm:text-right text-sm font-mono">${c.kg} kg / tub<br><span class="text-slate-500 text-xs">${so ? 0 : remTubs} tubs remaining</span></div></div>
 <div class="text-xs flex justify-between"><b>Hati-Hati Bañera</b><span>${so ? c.kg : c.claimed}/${c.kg} kg</span></div><div class="h-2 bg-slate-200 rounded mt-1"><div class="h-2 bg-[#006878] rounded" style="width:${p}%"></div></div>
 <div class="text-xs flex justify-between text-slate-500 mt-1"><span>${so ? 'Every tub claimed' : c.claimed + ' kg claimed'}</span><span>${o} kg open</span></div>${pt ? `<div class="text-xs font-semibold text-[#0B4A5D] mt-1">${pt}</div>` : ''}
 <div class="mt-2 min-h-[1.5rem]">${c.verified ? `<button class="text-xs text-[#006878] font-semibold" data-k="insp-${c.id}" onclick="run(this,'Loading photos…',()=>viewInsp('${c.id}'))">View inspection photos</button>` : ''}</div>
-${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? `<span>Bidding closes in</span> <b data-end="${c.auction_ends}" data-lot="${c.id}">${mmss(Date.parse(c.auction_ends) - Date.now())}</b>` : ''}</div>` : ''}${vend ? `<div class="mt-auto pt-3"><button class="btn" ${so || o <= 0 || !c.verified || ab ? 'disabled' : ''} onclick="claim('${c.id}')">${so ? (c.closed ? 'Closed' : 'Sold out') : !c.verified ? 'Awaiting Suri-Isda check' : ab ? 'Auction in progress' : o <= 0 ? 'Fully claimed' : '+ Claim Portion (Hati-Hati)'}</button></div>` : ''}</div></article>`
+${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? `<b data-end="${biddingEndsAt(c)}" data-lot="${c.id}">${mmss(Date.parse(biddingEndsAt(c)) - Date.now())} remaining</b>` : ''}</div>` : ''}${vend ? `<div class="mt-auto pt-3"><button class="btn w-full" ${so || o <= 0 || !c.verified || ab ? 'disabled' : ''} onclick="claim('${c.id}')">${so ? (c.closed ? 'Closed' : 'Sold out') : !c.verified ? 'Awaiting Suri-Isda check' : ab ? 'Auction in progress' : o <= 0 ? 'Fully claimed' : '+ Claim Portion (Hati-Hati)'}</button></div>` : ''}</div></article>`
     }
+    // Bid-to-Vendor Catalog Filtering: raw pier logs & rejected bids are hidden from Micro Vendors until won by a Broker.
+    const vendorReady = c => !!c && !!c.settled_at && !!c.winner_id && !(typeof isBidRejected === 'function' && isBidRejected(c.id));
     function floorGrid(hati) {
-      hati = hati || HATI; const live = S.catches.filter(c => !offFloor(c)); let l = live.slice(); if (hati) l = l.filter(c => c.claimed > 0 && open(c) > 0); const q = String(SQ || '').trim().toLowerCase(); if (q) l = l.filter(c => [c.name, c.src, c.id].join(' ').toLowerCase().includes(q));
-      return l.map(c => cardC(c, 1)).join('') || `<p class="text-slate-500 md:col-span-2 lg:col-span-3">${q ? 'No catches match your search.' : hati ? 'No portions are open right now. Check the Fresh Catches Floor.' : 'No catches are on the floor right now. New lots appear here after the Pier Checker logs them.'}</p>`
+      hati = hati || HATI; const live = S.catches.filter(c => !offFloor(c) && vendorReady(c)); let l = live.slice(); if (hati) l = l.filter(c => c.claimed > 0 && open(c) > 0); const q = String(SQ || '').trim().toLowerCase(); if (q) l = l.filter(c => [c.name, c.src, c.id].join(' ').toLowerCase().includes(q));
+      return l.map(c => cardC(c, 1)).join('') || `<p class="text-slate-500 md:col-span-2 lg:col-span-3">${q ? 'No catches match your search.' : hati ? 'No portions are open right now. Check the Fresh Catches Floor.' : 'No broker-won catches are on the floor right now. Lots appear here once a Consignee Broker wins the pier auction.'}</p>`
     }
     function fSearch(v) { SQ = v; const g = $('#fgrid'); if (!g) return; g.innerHTML = floorGrid(); iconify(g); trDom(g) }
     function floor(hati) {
-      hati = hati || HATI; const live = S.catches.filter(c => !offFloor(c)), cats = ['All']; if (!cats.includes(CAT)) CAT = 'All';
+      hati = hati || HATI; const live = S.catches.filter(c => !offFloor(c) && vendorReady(c)), cats = ['All']; if (!cats.includes(CAT)) CAT = 'All';
       return `<section class="ni-reef relative overflow-hidden rounded-2xl mb-4 bg-cover bg-center" style="background-size:cover;background-position:center"><span class="absolute inset-0 bg-black/55" aria-hidden="true"></span><div class="relative z-10 p-5 sm:p-8 text-white"><h1 class="bebas text-5xl sm:text-6xl text-white">Fresh Catches</h1><p class="sub-inter mt-1 text-base sm:text-xl text-white max-w-xl">${TAG[S.lang]}</p></div></section><div class="mb-4 flex flex-col gap-2 md:flex-row md:items-center"><div class="relative w-full md:w-64 lg:w-80 md:shrink-0"><label for="fq" class="sr-only">Search catches</label><span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400" aria-hidden="true"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="5.5"/><path d="m13.5 13.5 3.5 3.5"/></svg></span><input id="fq" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" maxlength="60" value="${esc(SQ)}" placeholder="${tr('Search catches')}" oninput="fSearch(this.value)" class="inp !h-11 !pl-9"></div><div class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1" role="group" aria-label="Catch filters">${cats.map(x => `<button class="pill border h-11 shrink-0 ${CAT === x ? 'on' : ''}" onclick="CAT='${x}';render()">${x}${x === 'All' ? ' · ' + live.length : ''}</button>`).join('')}<span class="mx-1 h-6 w-px shrink-0 bg-slate-300" aria-hidden="true"></span><button type="button" class="pill border h-11 shrink-0" onclick="SF='ongoing';S.tab='sold';render()">On-going</button><button type="button" class="pill border h-11 shrink-0" onclick="SF='sold';S.tab='sold';render()">Sold Out</button><button type="button" class="pill border h-11 shrink-0" onclick="SF='closed';S.tab='sold';render()">Closed</button></div></div>
  <div id="fgrid" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${floorGrid(hati)}</div>`
     }
@@ -1903,9 +2009,9 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     const pmClamp = (c, k) => { const o = open(c); k = parseFloat(k); return Math.max(Math.min(1, o), Math.min(k || 1, o)) };
     //-> Function: claim(catchId)
     //-> Opens the portion dialog for a lot with remaining stock and initializes its quantity in S.pm.
-    function claim(id) { const c = find(id); if (!c) return; if (offFloor(c)) return toast(ongoing(c) ? ONGMSG : 'This lot is sold out.', 1); if (open(c) <= 0) return; S.pm = { id, kg: pmClamp(c, 10) }; render() }
+    function claim(id) { const c = find(id); if (!c) return; if (!vendorReady(c)) return toast('This lot is still awaiting broker auction settlement.', 1); if (offFloor(c)) return toast(ongoing(c) ? ONGMSG : 'This lot is sold out.', 1); if (open(c) <= 0) return; S.pm = { id, kg: pmClamp(c, 10) }; render() }
     const portionModal = () => {
-      const m = S.pm; if (!m) return ''; const c = find(m.id); if (!c || open(c) <= 0 || offFloor(c)) { S.pm = null; return '' }
+      const m = S.pm; if (!m) return ''; const c = find(m.id); if (!c || !vendorReady(c) || open(c) <= 0 || offFloor(c)) { S.pm = null; return '' }
       const o = open(c), kg = m.kg = pmClamp(c, m.kg), t = tar(c.price, kg), mx = Math.max(1, Math.floor(o));
       return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-md p-5" role="dialog" aria-modal="true">
  <div class="flex justify-between items-start"><span class="text-xs font-mono text-blue-600 font-semibold uppercase tracking-wide">Hati-Hati portion allocation</span><button onclick="S.pm=null;render()" aria-label="Close" class="text-slate-500 text-2xl leading-none px-1">×</button></div>
@@ -1946,19 +2052,32 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     //-> Function: pmConfirm()
     //-> Queues the claim locally when offline; when online, submits the selected lot and kilograms through doClaim().
     async function pmConfirm() {
-      const m = S.pm, c = m && find(m.id); if (!c) return; if (m.over > open(c)) { pmErr(m.over); return toast(pmMsg(m.over, open(c)), 1) } const kg = pmClamp(c, m.kg);
-      S.pay = { id: m.id, kg, method: 'cash' }; S.pm = null; render()
+      const m = S.pm, c = m && find(m.id); if (!c) return; if (!vendorReady(c)) return toast('This lot is still awaiting broker auction settlement.', 1); if (m.over > open(c)) { pmErr(m.over); return toast(pmMsg(m.over, open(c)), 1) } const kg = pmClamp(c, m.kg);
+      S.pay = { id: m.id, kg, method: 'cash', fulfillment: 'broker_delivery', marketId: 'nepo', stallNote: '' }; S.pm = null; render()
     }
-    // ---> payment step (cash / cashless demo) before the escrow QR pass is generated <---
-    //-> Flow: Vendor picks Cash or Cashless (demo only), taps "Pay amount", the portion is claimed, then the escrow pass dialog opens with a downloadable receipt.
+    // ---> payment step (cash / cashless demo) + delivery mode before the escrow QR pass is generated <---
     const payModal = () => {
       const m = S.pay; if (!m) return ''; const c = find(m.id); if (!c) { S.pay = null; return '' }
-      const t = tar(c.price, m.kg);
+      if (!m.fulfillment) m.fulfillment = 'broker_delivery';
+      if (!m.marketId) m.marketId = 'nepo';
+      const t = tar(c.price, m.kg), rt = m.fulfillment === 'broker_delivery' ? calcMarketRoute(m.marketId, 'L300 Van', m.kg) : null;
       const opt = (v, ic, l, s) => `<label class="flex gap-3 items-start border-2 rounded-lg p-3 mt-2 cursor-pointer ${m.method === v ? 'border-[#006878]' : ''}"><input type="radio" name="pmeth" class="mt-1" ${m.method === v ? 'checked' : ''} onchange="S.pay.method='${v}';render()"><span><b class="text-sm">${ic} ${l}</b><br><span class="text-xs text-slate-500">${s}</span></span></label>`;
-      return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-md p-5" role="dialog" aria-modal="true" aria-label="Payment method">
- <div class="flex justify-between items-start"><span class="text-xs font-mono text-blue-600 font-semibold uppercase tracking-wide">Payment method</span><button onclick="S.pay=null;render()" aria-label="Close" class="text-slate-500 text-2xl leading-none px-1">×</button></div>
+      const delOpt = (v, ic, l, s) => `<label class="flex gap-3 items-start border-2 rounded-lg p-3 mt-2 cursor-pointer ${m.fulfillment === v ? 'border-[#006878]' : ''}"><input type="radio" name="pful" class="mt-1" ${m.fulfillment === v ? 'checked' : ''} onchange="S.pay.fulfillment='${v}';render()"><span><b class="text-sm">${ic} ${l}</b><br><span class="text-xs text-slate-500">${s}</span></span></label>`;
+      return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-md p-5 my-auto" role="dialog" aria-modal="true" aria-label="Payment and Delivery">
+ <div class="flex justify-between items-start"><span class="text-xs font-mono text-blue-600 font-semibold uppercase tracking-wide">Order, Fulfillment & Payment</span><button onclick="S.pay=null;render()" aria-label="Close" class="text-slate-500 text-2xl leading-none px-1">×</button></div>
  <h2 class="font-bold text-lg mt-2 uppercase">${c.name}</h2><div class="text-sm text-slate-500">${m.kg} kg × ${fmt(c.price)}/kg</div>
- ${opt('cash', '💵', 'Cash', 'Hand the exact amount to the broker at dockside pickup.')}${opt('cashless', '📱', 'Cashless', 'E-wallet or card payment.')}
+ <div class="text-xs font-mono text-slate-500 uppercase mt-3">Delivery / Pickup Option</div>
+ ${delOpt('broker_delivery', '🚚', 'Direct Delivery by Broker Transport', 'Delivered straight from Navotas Pier to your wet market stand.')}
+ ${delOpt('self_pickup', '⚓', 'Self-Pickup at the Pier Dock', 'Pick up directly at the pier dock using your Escrow QR Pass.')}
+ ${m.fulfillment === 'broker_delivery' ? `<div class="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50">
+   <label class="lbl !mt-0">Designated Wet Market / Palengke</label>
+   <select class="inp" onchange="S.pay.marketId=this.value;render()">${Object.values(MARKETS).map(mk => `<option value="${mk.id}" ${m.marketId === mk.id ? 'selected' : ''}>${mk.name} (${mk.km} km)</option>`).join('')}</select>
+   <label class="lbl">Market Stall / Stand # (optional)</label>
+   <input class="inp" placeholder="e.g. Stall 14, Fish Section" value="${esc(m.stallNote || '')}" oninput="S.pay.stallNote=this.value">
+   <div class="text-xs text-[#006878] font-mono mt-2">Est. Route: ${rt.km} km · ~${rt.etaText} · Est. Fleet Fee ${fmt(rt.transportFee)}</div>
+ </div>` : ''}
+ <div class="text-xs font-mono text-slate-500 uppercase mt-3">Payment method</div>
+ ${opt('cash', '💵', 'Cash', 'Hand the exact amount to the broker at dockside pickup or driver.')}${opt('cashless', '📱', 'Cashless', 'E-wallet or card payment.')}
  ${m.method === 'cashless' ? `<p role="note" class="mt-3 text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg p-2">This cashless payment is for demo only. No real money is charged.</p>` : ''}
  <div class="bg-slate-50 border border-slate-200 p-4 rounded-xl mt-4 text-sm space-y-2">
   <div class="flex justify-between gap-3"><span>Base portion cost</span><b class="font-mono">${fmt(t.base)}</b></div>
@@ -1969,12 +2088,13 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     //-> Function: payGo()
     //-> Simulates the cashless step (demo), then claims the portion. Offline, the claim and its payment are saved on this device and sent when you sync.
     async function payGo() {
-      const m = S.pay, c = m && find(m.id); if (!c) return; if (open(c) <= 0 || offFloor(c)) { S.pay = null; render(); return toast(ongoing(c) ? ONGMSG : 'This lot has just been fully claimed.', 1) }
+      const m = S.pay, c = m && find(m.id); if (!c) return; if (!vendorReady(c)) return toast('This lot is still awaiting broker auction settlement.', 1); if (open(c) <= 0 || offFloor(c)) { S.pay = null; render(); return toast(ongoing(c) ? ONGMSG : 'This lot has just been fully claimed.', 1) }
       const kg = pmClamp(c, m.kg), rnd = Math.random().toString(36).slice(2, 8).toUpperCase();
       const pay = { method: m.method, ref: (m.method === 'cashless' ? 'DEMO-' : 'CASH-') + rnd, at: new Date().toISOString() };
+      const shipOpts = { fulfillment: m.fulfillment || 'broker_delivery', marketId: m.marketId || 'nepo', stallNote: (m.stallNote || '').trim() };
       if (m.method === 'cashless') await new Promise(r => setTimeout(r, 1200));
-      if (!online()) { S.queue.push({ sid: 'SYNC-' + Date.now().toString(36).slice(-4).toUpperCase(), id: m.id, kg, t: new Date().toLocaleTimeString(), pay }); S.pay = null; toast('Offline: claim and payment saved on this device. Sync when online.'); return render() }
-      if (!await doClaim(m.id, kg, pay)) load(1)
+      if (!online()) { S.queue.push({ sid: 'SYNC-' + Date.now().toString(36).slice(-4).toUpperCase(), id: m.id, kg, t: new Date().toLocaleTimeString(), pay, shipOpts }); S.pay = null; toast('Offline: claim and payment saved on this device. Sync when online.'); return render() }
+      if (!await doClaim(m.id, kg, pay, shipOpts)) load(1)
     }
     const payMap = () => { try { return JSON.parse(localStorage.getItem('deal-pay-' + S.uid)) || {} } catch (e) { return {} } };
     const payOf = p => p.payment_method ? { method: p.payment_method, ref: p.payment_ref, at: p.paid_at || p.created_at } : payMap()[p.id] || null;
@@ -2007,9 +2127,11 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     }
     //-> Function: doClaim(catchId, kilograms)
     //-> Calls the Supabase claim_portion RPC, stores the returned escrow pass in state, reloads records, and redraws.
-    async function doClaim(id, kg, pay) {
-      const lot = find(id), wasLast = !!lot && +lot.tubs <= 1 && kg >= open(lot) - 1e-9; const { data, error } = await sb.rpc('claim_portion', { p_cid: id, p_kg: kg }); if (error) { toast(error.message, 1); return false }
+    async function doClaim(id, kg, pay, shipOpts) {
+      const lot = find(id), purchasedQty = lot ? Math.max(1, Math.ceil(kg / (+lot.kg || 25))) : 1, wasLast = !!lot && remainingTubs(lot) <= purchasedQty && kg >= open(lot) - 1e-9; const { data, error } = await sb.rpc('claim_portion', { p_cid: id, p_kg: kg }); if (error) { toast(error.message, 1); return false }
+      if (lot) lot.remaining_tubs = Math.max(0, remainingTubs(lot) - purchasedQty);
       if (pay && data && data.id) await paySave(data.id, pay);
+      if (lot && typeof createVendorOrder === 'function') createVendorOrder(lot, kg, data, pay, shipOpts || { fulfillment: 'broker_delivery', marketId: 'nepo', stallNote: '' });
       S.pm = null; S.pay = null; S.pass = data && data.pass_token ? { ...data, pay, t: new Date(data.created_at).toLocaleString() } : null; await load(1); const nl = find(id); toast((pay && pay.method === 'cashless' ? 'Payment received. Escrow pass generated.' : pay ? 'Portion claimed. Pay cash at pickup. Pass generated.' : 'Portion claimed.') + (wasLast && nl && soldOut(nl) ? ' This lot is now Sold out.' : '')); render(); return true
     }
 
@@ -2130,7 +2252,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     //-> Replays queued claims against Supabase, retains network-failed items in localStorage, then reloads and reports sync status.
     async function syncNow() {
       if (!online()) return toast('Still offline. Reconnect to sync.', 1); const q = S.queue, keep = []; let ok = 0;
-      for (const x of q) { const { data: sd, error } = await sb.rpc('claim_portion', { p_cid: x.id, p_kg: x.kg }); if (!error) { ok++; if (x.pay && sd && sd.id) paySave(sd.id, x.pay) } else { toast(`${x.sid}: ${error.message}`, 1); if (/failed to fetch|network|load failed/i.test(error.message)) keep.push(x) } }
+      for (const x of q) { const { data: sd, error } = await sb.rpc('claim_portion', { p_cid: x.id, p_kg: x.kg }); if (!error) { ok++; if (x.pay && sd && sd.id) paySave(sd.id, x.pay); const lot = find(x.id); if (lot && typeof createVendorOrder === 'function') createVendorOrder(lot, x.kg, sd, x.pay, x.shipOpts) } else { toast(`${x.sid}: ${error.message}`, 1); if (/failed to fetch|network|load failed/i.test(error.message)) keep.push(x) } }
       S.queue = keep; if (ok) note('Offline sync complete', ok + ' transaction(s) reconciled.', 1); toast(`${ok} of ${q.length} transaction(s) synced.`); await load(1); if (keep.length) toast('Network problem. Your saved claims are kept. Try again.', 1)
     }
     function syncV() { return h1('Offline Sync Engine', 'Transactions made without signal are stored here until you sync.') + (S.queue.length ? S.queue.map((q, qi) => `<div class="card p-4 mb-3" tabindex="0" data-qi="${qi}" aria-label="Saved transaction. Press Delete to remove."><span class="badge b-pend">⏱️ Pending Local Sync</span> <button class="btn2 !py-1 !px-2 text-xs float-right" onclick="delQ(${qi})">🗑️ Remove</button><div class="font-mono text-sm mt-1">${q.sid} · ${q.kg} kg ${(find(q.id) || {}).name} · ${q.t}</div></div>`).join('') + `<button class="btn" data-k="sync" onclick="run(this,'Syncing…',syncNow)">Sync pending transactions</button>` : `<p class="text-slate-500">Nothing pending. Tap the status badge in the header to simulate offline.</p>`) }
@@ -2315,15 +2437,26 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       let ai; try { ai = await aiInspect(files, ev) } catch (e) { return toast(e.message, 1) }
       const sc = Math.min(10, Math.max(1, +ai.freshness_score || 1)), pass = !!ai.passed;
       const photo = await shrink(files[0], 800, .75);
+      const { data: { user: curAuth } } = await sb.auth.getUser();
+      if (!curAuth || curAuth.id !== S.uid) {
+        await enter();
+        return toast('Your session changed in another browser tab. Please sign in as Pier Checker in this window and try again.', 1);
+      }
       const id = 'CAT-' + String(Math.max(0, ...S.catches.map(c => +c.id.slice(4))) + 1).padStart(3, '0');
       const ins = await sb.from('catches').insert({ id, name, sci: '', price: +d.base, start: +d.start, bid: +d.start, kg: +d.kg, tubs: +d.tubs, claimed: 0, verified: false, src: esc(d.vessel).slice(0, 60) + ' · ' + d.station, fresh: 0, photo: photo === 'ERR' ? null : photo });
-      if (ins.error) return toast(ins.error.message, 1);
+      if (ins.error) {
+        const msg = /row-level security/i.test(ins.error.message)
+          ? 'Permission denied by Supabase RLS: verify your account has role="checker" & approved=true in profiles (or no other tab signed into a different role).'
+          : ins.error.message;
+        return toast(msg, 1);
+      }
       const up = await sb.from('catches').update({ verified: pass, fresh: sc }).eq('id', id); if (up.error) return toast(`${id} was logged, but the AI result could not be saved: ` + up.error.message, 1);
       const rep = { checks: ai.checks, freshness_score: sc, passed: pass, summary: ai.summary || '' };
       { const m = lsMap(LOGK()); m[id] = { t: new Date().toISOString(), res: pass ? 'Passed' : 'Flagged', name }; lsSet(LOGK(), m) }
       const ci = await sb.from('checks').insert({ cid: id, name, res: pass ? 'Passed' : 'Flagged', fresh: sc, by_name: S.user, photo_top: ev[0], photo_mid: ev[1], photo_bot: ev[2], ai_report: rep });
       if (ci.error) toast('Lot saved, but the inspection record was not: ' + ci.error.message, 1);
       await load();
+      if (pass) playChime();
       S.ev = { cid: id, name, res: pass ? 'Passed' : 'Flagged', fresh: sc, by_name: S.user, photo_top: ev[0], photo_mid: ev[1], photo_bot: ev[2], ai_report: rep }; render();
       toast(pass ? `${id} passed the AI Suri-Isda check.` : `${id} was logged but flagged by the AI check.`, !pass)
     }
@@ -2334,6 +2467,19 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
 
     // ---> broker consignments and live bidding <---
     //-> Broker flow: Select a lot, review inspection and Taripa details, enter a valid bid, and submit it for server-side validation.
+    const AUCTION_DURATION_MS = 60000;
+    const biddingEndsAt = c => {
+      if (!c) return '';
+      if (c.bidding_ends_at) return c.bidding_ends_at;
+      if (c.auction_ends) {
+        const endMs = Date.parse(c.auction_ends), startMs = c.created_at ? Date.parse(c.created_at) : NaN;
+        if (!isNaN(endMs) && !isNaN(startMs) && endMs - startMs > AUCTION_DURATION_MS + 5000) {
+          return new Date(Math.min(endMs, startMs + AUCTION_DURATION_MS)).toISOString();
+        }
+        return c.auction_ends;
+      }
+      return '';
+    };
     const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0') };
     const bidder = (id, ident) => id && id === S.uid ? 'You' : ident ? 'Broker ···' + String(ident).slice(-4) : '—';
     const iBid = cid => S.bids.some(b => b.cid === cid && b.broker_id === S.uid);
@@ -2350,15 +2496,16 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       const head = h1('Consignations & Live Bids', 'Watch bulk lots, see a clear Taripa, and keep payment held until inspection passes.');
       if (!c) return head + (S.catches.length ? '<p class="text-slate-500">All lots are sold out or closed. See Sold Out / Closed Catches.</p>' : '<p class="text-slate-500">No lots yet. They appear here after the Pier Checker logs them.</p>');
       const t = tar(c.bid, c.kg), mine = !!S.uid && c.bid_by === S.uid, state = lotState(c), min = minNext(c), top = c.bid_count ? c.bid : +c.start,
-        canBid = state === 'open' || state === 'live', val = S.bidIn[c.id] ?? min, hist = S.bids.filter(b => b.cid === c.id).slice(0, 8), [lt, lc] = liveTxt(),
-        endTag = x => `<b data-end="${x.auction_ends}" data-lot="${x.id}">${mmss(Date.parse(x.auction_ends) - Date.now())}</b>`;
+        endsIso = biddingEndsAt(c), clockOpen = !endsIso || Date.parse(endsIso) > Date.now(),
+        canBid = (state === 'open' || state === 'live') && clockOpen, val = S.bidIn[c.id] ?? min, hist = S.bids.filter(b => b.cid === c.id).slice(0, 8), [lt, lc] = liveTxt(),
+        endTag = x => { const iso = biddingEndsAt(x); return `<b data-end="${iso}" data-lot="${x.id}">${mmss(Date.parse(iso) - Date.now())} remaining</b>`; };
       const banner = state === 'closed' ? `<div class="auction-banner rounded-lg p-3 text-sm border mt-3">🏆 <b>Auction closed</b> · <span>Winner</span> <b>${bidder(c.winner_id, c.winner_ident)}</b> · <b class="font-mono">${fmt(c.bid)}/kg</b><div class="text-xs mt-1">Vendors can now claim portions at this price.</div></div>`
         : state === 'escrow' ? `<div class="rounded-lg p-3 text-sm bg-yellow-50 border border-yellow-200 mt-3">Portions were already claimed at the listed price, so bidding is closed.</div>`
-          : state === 'live' ? `<div class="rounded-lg p-3 text-sm mt-3 border ${mine ? 'bg-emerald-50 border-emerald-200' : iBid(c.id) ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}"><div class="flex justify-between gap-2"><b>${mine ? 'You are winning this lot' : iBid(c.id) ? 'You were outbid. Raise your bid to take the lead.' : '<span>Top bid held by</span> ' + bidder(c.bid_by, c.bid_by_ident)}</b><span class="font-mono whitespace-nowrap"><span>Closes in</span> ${endTag(c)}</span></div></div>`
-            : state === 'open' ? `<div class="rounded-lg p-3 text-sm mt-3 bg-slate-50 border border-slate-200">No bids yet. The first bid starts the closing clock.</div>` : '';
+          : state === 'live' ? `<div class="rounded-lg p-3 text-sm mt-3 border ${mine ? 'bg-emerald-50 border-emerald-200' : iBid(c.id) ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}"><div class="flex justify-between gap-2"><b>${mine ? 'You are winning this lot' : iBid(c.id) ? 'You were outbid. Raise your bid to take the lead.' : '<span>Top bid held by</span> ' + bidder(c.bid_by, c.bid_by_ident)}</b><span class="font-mono whitespace-nowrap">${endTag(c)}</span></div></div>`
+            : state === 'open' ? `<div class="rounded-lg p-3 text-sm mt-3 bg-slate-50 border border-slate-200">No bids yet. The first bid starts the 1-minute closing clock.</div>` : '';
       const form = canBid ? `<div class="mt-3"><label class="lbl !mt-0" for="bidAmt">Your bid (₱/kg)</label><div class="flex gap-2"><input id="bidAmt" type="number" inputmode="decimal" step="0.5" min="${min}" value="${val}" class="inp flex-1 font-mono text-lg" oninput="S.bidIn['${c.id}']=this.value" onkeydown="if(event.key==='Enter')document.querySelector('[data-k=\\'bid-${c.id}\\']').click()"><button class="btn !w-auto px-5" data-k="bid-${c.id}" ${mine ? 'disabled' : ''} onclick="run(this,'Placing bid…',()=>placeBid('${c.id}'))">Place bid</button></div>
   <div class="flex flex-wrap items-center gap-2 mt-2 text-xs"><span class="text-slate-500">Minimum next bid</span><b class="font-mono">${fmt(min)}/kg</b><span class="grow"></span>${[[`Min`, min], ['+₱5', Math.max(min, top + 5)], ['+₱10', Math.max(min, top + 10)]].map(([l, x]) => `<button type="button" class="pill border" onclick="setBid('${c.id}',${x})">${l === 'Min' ? '<span>Min</span>' : l}</button>`).join('')}</div>${mine ? '<div class="text-xs text-emerald-700 mt-2">You hold the top bid.</div>' : ''}</div>` : '';
-      const rows = act.map(x => { const s = LOT_BADGE[lotState(x)]; return `<tr tabindex="0" onclick="S.sel='${x.id}';render()" class="border-t cursor-pointer ${x.id === c.id ? 'bg-teal-50' : 'hover:bg-slate-50'}"><td class="p-3"><b class="font-mono">${x.id}</b><br><span class="text-xs">${x.name}</span></td><td>${x.kg}kg × ${x.tubs}</td><td class="font-mono">${fmt(x.bid)}${x.bid_count ? `<div class="text-xs font-sans ${x.bid_by === S.uid ? 'text-emerald-600' : 'text-slate-500'}">${x.bid_by === S.uid ? '<span>You lead</span>' : bidder(x.bid_by, x.bid_by_ident)}</div>` : ''}</td><td><span class="badge ${s[1]}">${s[0]}</span>${lotState(x) === 'live' ? `<div class="text-xs font-mono mt-1" data-end="${x.auction_ends}" data-lot="${x.id}">${mmss(Date.parse(x.auction_ends) - Date.now())}</div>` : ''}${bpWon(x) ? `<div class="text-xs mt-1 ${bpOf(x.id) ? 'text-emerald-700' : 'text-amber-700 font-semibold'}">${bpOf(x.id) ? 'Paid' : 'Payment due'}</div>` : ''}</td></tr>` }).join('');
+      const rows = act.map(x => { const s = LOT_BADGE[lotState(x)], xEnd = biddingEndsAt(x); return `<tr tabindex="0" onclick="S.sel='${x.id}';render()" class="border-t cursor-pointer ${x.id === c.id ? 'bg-teal-50' : 'hover:bg-slate-50'}"><td class="p-3"><b class="font-mono">${x.id}</b><br><span class="text-xs">${x.name}</span></td><td>${x.kg}kg × ${x.tubs}</td><td class="font-mono">${fmt(x.bid)}${x.bid_count ? `<div class="text-xs font-sans ${x.bid_by === S.uid ? 'text-emerald-600' : 'text-slate-500'}">${x.bid_by === S.uid ? '<span>You lead</span>' : bidder(x.bid_by, x.bid_by_ident)}</div>` : ''}</td><td><span class="badge ${s[1]}">${s[0]}</span>${lotState(x) === 'live' ? `<div class="text-xs font-mono mt-1" data-end="${xEnd}" data-lot="${x.id}">${mmss(Date.parse(xEnd) - Date.now())} remaining</div>` : ''}${bpWon(x) ? `<div class="text-xs mt-1 ${bpOf(x.id) ? 'text-emerald-700' : 'text-amber-700 font-semibold'}">${bpOf(x.id) ? 'Paid' : 'Payment due'}</div>` : ''}</td></tr>` }).join('');
       return head + `<div class="grid grid-cols-3 gap-3 mb-4">${[['Active lots', v.length], ['Tubs in stock', act.reduce((a, x) => a + x.tubs, 0)]].map(([a, b]) => `<div class="card p-4"><div class="text-xs font-mono text-slate-500">${a}</div><div class="font-mono text-2xl font-bold">${b}</div></div>`).join('')}<div class="card p-4"><div class="text-xs font-mono text-slate-500">Live bids</div><div id="liveTile" class="font-mono font-bold ${lc}" aria-live="polite">${lt}</div></div></div>
 <div class="grid lg:grid-cols-2 gap-4 items-start"><div class="card overflow-x-auto"><table class="w-full text-sm"><thead class="text-xs font-mono text-left text-slate-500"><tr><th class="p-3">Batch</th><th>Volume</th><th>Top bid</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>
 <div class="card p-5">${c.photo ? `<img src="${c.photo}" class="w-full h-44 object-cover rounded-lg mb-3" alt="">` : ''}<div class="font-mono text-xs text-slate-500">SELECTED · ${c.id}</div><h2 class="font-semibold text-lg">${c.name}</h2><p class="text-xs keep-c">${c.src}</p>
@@ -2374,9 +2521,12 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     //-> Function: placeBid(catchId)
     //-> Reads the bid amount, sends it to the Supabase place_bid RPC, reports validation results, then reloads the auction state.
     async function placeBid(id) {
-      const lot = find(id); if (lot && offFloor(lot)) return toast(ongoing(lot) ? ONGMSG : 'This lot is sold out.', 1); const amt = parseFloat(($('#bidAmt') || {}).value ?? S.bidIn[id]); if (!(amt > 0)) return toast('Enter a bid above 0.', 1);
+      const lot = find(id); if (lot && offFloor(lot)) return toast(ongoing(lot) ? ONGMSG : 'This lot is sold out.', 1);
+      const endIso = lot && biddingEndsAt(lot); if (endIso && Date.parse(endIso) <= Date.now()) return toast('Bidding round has ended for this lot.', 1);
+      const amt = parseFloat(($('#bidAmt') || {}).value ?? S.bidIn[id]); if (!(amt > 0)) return toast('Enter a bid above 0.', 1);
       const { data, error } = await sb.rpc('place_bid', { p_cid: id, p_amount: amt }); if (error) return toast(error.message, 1);
       if (!data.success) { toast(BIDMSG(data), 1); return load(1) }
+      if (lot && !lot.auction_ends) lot.bidding_ends_at = new Date(Date.now() + AUCTION_DURATION_MS).toISOString();
       delete S.bidIn[id]; toast('Bid placed. You hold the top bid.'); await load(1)
     }
     async function editStart(id, btn) {
@@ -2387,8 +2537,8 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     let tickT = null, pollT = null; const chase = {};
     function tickAuction() {
       document.querySelectorAll('[data-end]').forEach(e => {
-        const ms = Date.parse(e.dataset.end) - Date.now(); e.textContent = ms > 0 ? mmss(ms) : tr('Closing…');
-        if (ms <= 0) { const id = e.dataset.lot; if (Date.now() - (chase[id] || 0) > 3000) { chase[id] = Date.now(); load(1) } }
+        const ms = Date.parse(e.dataset.end) - Date.now(); e.textContent = ms > 0 ? mmss(ms) + ' remaining' : tr('Closing…');
+        if (ms <= 0) { const id = e.dataset.lot; if (Date.now() - (chase[id] || 0) > 3000) { chase[id] = Date.now(); sb.rpc('settle_due_auctions').then(() => load(1)).catch(() => load(1)) } }
       })
     }
     /* fallback: if realtime is not connected, or has been quiet for 30 s, fetch again every 10 s */
@@ -2610,15 +2760,433 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     }
     function trDom(r) { if (S.lang === 'EN') return; const w = document.createTreeWalker(r, NodeFilter.SHOW_TEXT); let n; while (n = w.nextNode()) { const t = n.nodeValue, k = t.trim(); if (k) { const v = tr(k); if (v !== k) n.nodeValue = t.replace(k, () => v) } } }
 
+    // ---> unified "Orders" system: All Orders, To Receive, To Rate, Chatbox, Call/SMS & Ratings <---
+    const ORD_K = 'deal-orders-v1';
+    const MARKETS = {
+      nepo: { id: 'nepo', name: 'Nepo Market (Malabon)', city: 'Malabon City', km: 4.8, baseMin: 18, feeBase: 120 },
+      malabon: { id: 'malabon', name: 'Malabon Central Market', city: 'Malabon City', km: 5.4, baseMin: 20, feeBase: 130 },
+      navotas: { id: 'navotas', name: 'Navotas Agora / Public Market', city: 'Navotas City', km: 3.1, baseMin: 14, feeBase: 95 },
+      agora: { id: 'agora', name: 'Agora Market (San Juan)', city: 'San Juan City', km: 15.6, baseMin: 46, feeBase: 260 },
+      farmers: { id: 'farmers', name: 'Farmers Market (Cubao)', city: 'Quezon City', km: 17.2, baseMin: 52, feeBase: 290 },
+      munoz: { id: 'munoz', name: 'Muñoz Market (EDSA)', city: 'Quezon City', km: 11.4, baseMin: 35, feeBase: 210 }
+    };
+    const FLEET_TYPES = {
+      'L300 Van': { label: 'L300 Van', speedFactor: 1.0, feeMult: 1.0, cold: 'Iced Boxed' },
+      'Insulated Chilled Truck': { label: 'Insulated Chilled Truck', speedFactor: 1.12, feeMult: 1.25, cold: 'Chilled 0–4°C' },
+      'Motorized Tricycle / Kuliglig': { label: 'Motorized Tricycle / Kuliglig', speedFactor: 0.9, feeMult: 0.75, cold: 'Insulated Tub' }
+    };
+    let ORD_TAB = 'all';
+    const ORD_STAR = {};
+    const ordRead = () => { try { const a = JSON.parse(localStorage.getItem(ORD_K)); return Array.isArray(a) ? a : [] } catch (e) { return [] } };
+    const ordWrite = list => { try { localStorage.setItem(ORD_K, JSON.stringify(list)) } catch (e) { } };
+    const orderQrToken = o => {
+      if (o.qrToken) return o.qrToken;
+      let h = 2166136261; const s = `${o.id}|${o.cid}|${o.createdAt || ''}`;
+      for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
+      return (h >>> 0).toString(16).padStart(8, '0') + 'deal9f2a';
+    };
+    const orderQrPayload = o => `ORDQR1|${o.id}|${o.cid}|${orderQrToken(o)}`;
+    addEventListener('storage', e => { if (e.key === ORD_K && S.user) render() });
+    function calcMarketRoute(marketId, vehicleType = 'L300 Van', kg = 10) {
+      const m = MARKETS[marketId] || MARKETS.nepo, f = FLEET_TYPES[vehicleType] || FLEET_TYPES['L300 Van'];
+      const etaMinutes = Math.max(10, Math.round(m.baseMin / f.speedFactor));
+      const transportFee = Math.round((m.feeBase + (+kg || 0) * 1.5) * f.feeMult);
+      return { market: m.name, city: m.city, km: m.km, etaMinutes, etaText: `${etaMinutes} mins`, transportFee, coldChain: f.cold };
+    }
+    const isBidRejected = cid => ordRead().some(o => o.kind === 'pier_acquisition' && o.cid === cid && o.status === 'Rejected');
+    function syncPierAcquisitions(catches, notifyNew) {
+      const list = ordRead(); let changed = false;
+      for (const c of (catches || [])) {
+        if (!c.settled_at || !c.winner_id) continue;
+        const id = 'ACQ-' + c.id;
+        if (list.some(o => o.id === id)) continue;
+        const now = new Date().toISOString();
+        const rec = {
+          id, kind: 'pier_acquisition', cid: c.id, catchName: c.name, kg: +c.kg, pricePerKg: +c.bid,
+          total: tar(c.bid, c.kg).total, pierLocation: c.src || 'Navotas Pier 1 Dock',
+          checkerIdent: 'TC-NAV-01', checkerPhone: '0917-555-0101',
+          brokerIdent: c.winner_ident || 'Consignee Broker', brokerPhone: '0918-555-0202',
+          status: 'Pending Acceptance', escrowStatus: 'Escrow Held', chats: [], ratings: { checker: null, broker: null },
+          createdAt: now, updatedAt: now
+        };
+        rec.qrToken = orderQrToken(rec);
+        list.unshift(rec);
+        changed = true;
+        if (notifyNew) noteFor(['checker'], 'Winning Bid Needs Approval', `${c.id} (${c.name}) won at ${fmt(c.bid)}/kg. Review in Orders.`);
+      }
+      if (changed) ordWrite(list);
+    }
+    function syncVendorOrdersFromPasses(passes) {
+      if (S.role !== 'vendor' || !Array.isArray(passes) || !passes.length) return;
+      const list = ordRead(); let changed = false;
+      for (const p of passes) {
+        if (!p || !p.id) continue;
+        if (list.some(o => o.passId === p.id)) continue;
+        const lot = find(p.cid) || {};
+        const now = p.created_at || new Date().toISOString();
+        const rec = {
+          id: 'ORD-' + String(p.id).replace(/[^A-Za-z0-9]/g, '').slice(-5).toUpperCase(),
+          kind: 'vendor_sale',
+          passId: p.id,
+          cid: p.cid || 'LOT',
+          catchName: p.name || lot.name || 'Fresh Catch',
+          kg: +p.kg || 0,
+          tubs: Math.max(1, Math.ceil((+p.kg || 1) / (+lot.kg || 25))),
+          pricePerKg: +lot.price || 0,
+          total: +p.total || 0,
+          vendorIdent: S.user || 'Micro-Vendor',
+          vendorPhone: /^09/.test(S.user || '') ? S.user : '0919-555-0303',
+          brokerIdent: lot.winner_ident || 'Consignee Broker',
+          brokerPhone: '0918-555-0202',
+          pierStation: lot.src || S.station || 'Navotas Pier 1',
+          fulfillment: 'self_pickup',
+          marketId: null,
+          marketName: 'Navotas Pier Dock',
+          stallNote: '',
+          status: p.status === 'released' ? 'Delivered' : 'Accepted',
+          escrowStatus: p.status === 'released' ? 'Released' : 'Escrow Held',
+          vehicle: null,
+          route: null,
+          payMethod: (payOf(p) || {}).method || 'cash',
+          chats: [],
+          ratings: { broker: null, vendor: null },
+          createdAt: now,
+          updatedAt: p.scanned_at || now
+        };
+        rec.qrToken = orderQrToken(rec);
+        list.unshift(rec);
+        changed = true;
+      }
+      if (changed) ordWrite(list);
+    }
+    function speakOrderPlaced() {
+      if (S.mute || !TTS || !TTS.ok) return;
+      const msg = S.lang === 'EN'
+        ? 'Order placed, you may view the status of your order on the Order Navigation.'
+        : 'Na-kumpirma na ang iyong bibilhin, pumunta sa Order para makita ang kalagayan ng iyong order.';
+      TTS.speak(msg, 'order-placed');
+    }
+    function createVendorOrder(lot, kg, passData, pay, opts) {
+      const o = opts || { fulfillment: 'broker_delivery', marketId: 'nepo', stallNote: '' };
+      const isDel = o.fulfillment !== 'self_pickup', mk = MARKETS[o.marketId] || MARKETS.nepo, rt = isDel ? calcMarketRoute(mk.id, 'L300 Van', kg) : null;
+      const now = new Date().toISOString();
+      const rec = {
+        id: 'ORD-' + Date.now().toString(36).slice(-5).toUpperCase(),
+        kind: 'vendor_sale',
+        passId: (passData && passData.id) || ('PASS-' + Date.now().toString(36).slice(-4).toUpperCase()),
+        cid: lot.id, catchName: lot.name, kg: +kg, tubs: Math.max(1, Math.ceil(+kg / (+lot.kg || 25))),
+        pricePerKg: +lot.price,
+        total: passData && passData.total ? +passData.total : tar(lot.price, kg).total,
+        vendorIdent: S.user || 'Micro-Vendor',
+        vendorPhone: /^09/.test(S.user || '') ? S.user : '0919-555-0303',
+        brokerIdent: lot.winner_ident || 'Consignee Broker', brokerPhone: '0918-555-0202',
+        pierStation: lot.src || S.station || 'Navotas Pier 1',
+        fulfillment: isDel ? 'broker_delivery' : 'self_pickup',
+        marketId: isDel ? mk.id : null, marketName: isDel ? mk.name : 'Navotas Pier Dock', stallNote: o.stallNote || '',
+        status: 'Pending Approval', escrowStatus: 'Escrow Held',
+        vehicle: null, route: rt, payMethod: (pay && pay.method) || 'cash',
+        chats: [], ratings: { broker: null, vendor: null },
+        createdAt: now, updatedAt: now
+      };
+      rec.qrToken = orderQrToken(rec);
+      const list = ordRead(); list.unshift(rec); ordWrite(list);
+      playChime();
+      speakOrderPlaced();
+      noteFor(['broker', 'vendor'], 'New Vendor Order Placed', `${lot.id} (${kg} kg) ordered by ${rec.vendorIdent} for ${rec.marketName}.`, 1);
+      return rec;
+    }
+    function ordBadge(status) {
+      const m = {
+        'Pending Acceptance': 'bg-amber-100 text-amber-800',
+        'Pending Approval': 'bg-amber-100 text-amber-800',
+        'Accepted': 'bg-sky-100 text-sky-800',
+        'In Transit': 'bg-teal-100 text-teal-800',
+        'Delivered': 'bg-emerald-100 text-emerald-800',
+        'Rejected': 'bg-red-100 text-red-800',
+        'Cancelled': 'bg-slate-200 text-slate-700'
+      };
+      return `<span class="badge ${m[status] || 'bg-slate-100 text-slate-700'}">${esc(status)}</span>`;
+    }
+    function kindBadge(kind) {
+      return kind === 'pier_acquisition'
+        ? `<span class="badge bg-indigo-100 text-indigo-800">⚓ Pier Acquisition</span>`
+        : `<span class="badge bg-teal-100 text-teal-800">🏪 Vendor Sale</span>`;
+    }
+    function orderAttentionCount() {
+      const list = ordRead();
+      if (S.role === 'checker') return list.filter(o => o.kind === 'pier_acquisition' && (o.status === 'Pending Acceptance' || o.status === 'Accepted')).length;
+      if (S.role === 'broker') return list.filter(o => (o.kind === 'vendor_sale' && (o.status === 'Pending Approval' || o.status === 'Accepted' || o.status === 'In Transit')) || (o.kind === 'pier_acquisition' && o.status === 'Accepted')).length;
+      if (S.role === 'vendor') return list.filter(o => o.kind === 'vendor_sale' && (o.status === 'Accepted' || o.status === 'In Transit')).length;
+      return 0;
+    }
+    function acceptPierBid(id) {
+      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return;
+      o.status = 'Accepted'; o.qrToken = orderQrToken(o); o.updatedAt = new Date().toISOString(); ordWrite(list);
+      noteFor(['checker', 'broker'], 'Pier Bid Accepted', `${o.cid} accepted by Pier Checker. QR Release Pass ready for dock hand-off.`);
+      render();
+    }
+    function rejectPierBid(id) {
+      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return;
+      o.status = 'Rejected'; o.updatedAt = new Date().toISOString(); ordWrite(list);
+      noteFor(['checker', 'broker'], 'Pier Bid Rejected', `${o.cid} winning bid was rejected by Pier Checker.`);
+      render();
+    }
+    function acceptVendorOrder(id) {
+      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return;
+      o.status = 'Accepted'; o.qrToken = orderQrToken(o); o.updatedAt = new Date().toISOString(); ordWrite(list);
+      noteFor(['broker', 'vendor'], 'Market Order Accepted', `${o.cid} (${o.kg} kg) accepted by Broker. Delivery QR Pass is ready.`);
+      render();
+    }
+    function rejectVendorOrder(id) {
+      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return;
+      o.status = 'Rejected'; o.updatedAt = new Date().toISOString(); ordWrite(list);
+      noteFor(['broker', 'vendor'], 'Market Order Rejected', `${o.cid} (${o.kg} kg) was rejected by Broker.`);
+      render();
+    }
+    function dispatchVendorOrder(id) {
+      const driverName = (vl('drv-' + id) || '').trim(), vehicleType = vl('veh-' + id) || 'L300 Van', plateNo = (vl('plt-' + id) || '').trim().toUpperCase(), contactNo = (vl('cnt-' + id) || '').trim();
+      if (!driverName || !plateNo || !contactNo) return toast('Enter driver name, plate number, and contact number.', 1);
+      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return;
+      const rt = calcMarketRoute(o.marketId, vehicleType, o.kg);
+      o.vehicle = { driverName: esc(driverName), vehicleType, plateNo: esc(plateNo), contactNo: esc(contactNo) };
+      o.route = rt; o.status = 'In Transit'; o.updatedAt = new Date().toISOString(); ordWrite(list);
+      noteFor(['broker', 'vendor'], 'Order In Transit to Market', `${o.cid} dispatched via ${vehicleType} (${plateNo}) to ${o.marketName}. ETA ${rt.etaText}.`);
+      render();
+    }
+    let ORD_SC = null, ORD_SC_BUSY = false, ORD_SC_CTX = null;
+    async function closeOrderScanner() {
+      const d = $('#ordScanLayer'), c = ORD_SC; ORD_SC = null; ORD_SC_BUSY = false; ORD_SC_CTX = null;
+      if (c) { try { await c.stop() } catch (e) { } try { c.clear() } catch (e) { } }
+      if (d) d.remove();
+    }
+    async function openOrderScanner(orderId, phase) {
+      const list = ordRead(), o = list.find(x => x.id === orderId); if (!o) return;
+      await closeOrderScanner(); unlockAudio();
+      ORD_SC_CTX = { orderId, phase };
+      const title = phase === 'pier' ? 'Scan Broker QR Release Pass' : 'Scan Micro-Vendor Delivery QR';
+      const sub = phase === 'pier' ? `Point camera at Broker QR Pass for ${o.cid} (${o.catchName}).` : `Point camera at Micro-Vendor Delivery QR for ${o.cid} (${o.marketName}).`;
+      const d = document.createElement('div'); d.id = 'ordScanLayer'; d.className = 'fixed inset-0 bg-[#0B0E17]/80 flex items-center justify-center p-4 z-50 overflow-y-auto';
+      d.innerHTML = `<div class="card w-full max-w-md p-4" role="dialog" aria-modal="true"><div class="flex justify-between items-center"><h2 class="font-mono font-bold text-lg">📷 ${esc(title)}</h2><button class="text-sm text-[#006878] font-semibold" onclick="closeOrderScanner()">Close</button></div>
+<p class="text-sm text-slate-500 mt-1">${esc(sub)}</p>
+<div id="ord-qr-reader" class="mt-3 rounded-lg overflow-hidden bg-black min-h-[240px]"></div>
+<label id="ordScFile" class="hidden btn2 mt-3 text-center cursor-pointer block">Scan QR from photo<input type="file" accept="image/*" class="hidden" onchange="ordScFileScan(this)"></label>
+<div id="ordScRes" class="mt-3" aria-live="polite"></div>
+<div class="mt-3 pt-3 border-t border-slate-200"><div class="text-[0.6875rem] font-mono text-slate-500 mb-1.5">No camera on this device? Verify QR token manually:</div><div class="flex gap-2"><input id="ordQrManual" class="inp !py-1.5 text-xs font-mono flex-1" placeholder="ORDQR1|..." value="${esc(orderQrPayload(o))}"><button type="button" class="btn !w-auto px-3 !py-1.5 text-xs" onclick="verifyOrderQr('${o.id}', vl('ordQrManual'), '${phase}')">Verify QR</button></div></div></div>`;
+      document.body.append(d); trDom(d);
+      if (!window.Html5Qrcode) { $('#ordScFile').classList.remove('hidden'); return; }
+      try {
+        let rear; try { const cams = await Html5Qrcode.getCameras(); rear = cams.find(c => /(back|rear|environment|world)/i.test(c.label)) } catch (e) { }
+        ORD_SC = new Html5Qrcode('ord-qr-reader', { verbose: false, formatsToSupport: window.Html5QrcodeSupportedFormats ? [Html5QrcodeSupportedFormats.QR_CODE] : undefined });
+        await ORD_SC.start(rear ? rear.id : { facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => { const x = Math.floor(Math.min(w, h) * .7); return { width: x, height: x } } }, txt => { if (!ORD_SC_BUSY) { ORD_SC_BUSY = true; verifyOrderQr(orderId, txt, phase) } }, () => { });
+      } catch (e) {
+        $('#ordScFile').classList.remove('hidden');
+        const r = $('#ordScRes'); if (r) r.innerHTML = `<div class="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">Camera unavailable. Upload a QR photo or use the manual QR token verification below.</div>`;
+      }
+    }
+    async function ordScFileScan(inp) {
+      const f = inp.files[0]; inp.value = ''; if (!f || !ORD_SC || !ORD_SC_CTX) return;
+      try { const t = await ORD_SC.scanFile(f, false); verifyOrderQr(ORD_SC_CTX.orderId, t, ORD_SC_CTX.phase) } catch (e) { toast('No QR code found in that photo.', 1) }
+    }
+    function verifyOrderQr(orderId, rawText, phase) {
+      const list = ordRead(), o = list.find(x => x.id === orderId);
+      if (!o) { ORD_SC_BUSY = false; return toast('Order not found.', 1); }
+      const expected = orderQrPayload(o), scanned = String(rawText || '').trim();
+      if (scanned !== expected) {
+        ORD_SC_BUSY = false; beep(0); buzz([300]);
+        const r = $('#ordScRes'); if (r) r.innerHTML = `<div class="rounded-xl border-2 border-red-500 bg-red-100 text-red-800 p-3 text-xs font-bold">✕ QR mismatch! This pass does not belong to ${esc(o.id)}.</div>`;
+        return;
+      }
+      const nowIso = new Date().toISOString();
+      o.status = 'Delivered';
+      o.escrowStatus = 'Released';
+      o.qrVerifiedAt = nowIso;
+      o.qrVerifiedBy = S.user || roleLabel(S.role);
+      o.updatedAt = nowIso;
+      ordWrite(list);
+      beep(1); buzz([100, 50, 100]);
+      if (phase === 'pier') {
+        noteFor(['checker', 'broker'], 'Pier QR Release Verified', `${o.cid} verified via QR scan by ${o.qrVerifiedBy}. Handed to Broker & archived to History.`);
+      } else {
+        noteFor(['broker', 'vendor'], 'Market QR Delivery Verified', `${o.cid} delivered to ${o.marketName} & QR-verified! Archived to History.`);
+      }
+      closeOrderScanner();
+      render();
+    }
+    function sendOrderChat(id) {
+      const inp = $('#chat-in-' + id), msg = inp ? inp.value.trim() : '';
+      if (!msg) return toast('Enter a message first.', 1);
+      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return;
+      if (!Array.isArray(o.chats)) o.chats = [];
+      o.chats.push({ role: S.role, sender: S.user || roleLabel(S.role), text: esc(msg), at: new Date().toLocaleTimeString() });
+      o.updatedAt = new Date().toISOString(); ordWrite(list);
+      const targetRoles = (o.kind === 'pier_acquisition' ? ['checker', 'broker'] : ['broker', 'vendor']).filter(x => x !== S.role);
+      noteFor(targetRoles, 'New Order Message', `${roleLabel(S.role)} (${o.cid}): ${msg.slice(0, 60)}`);
+      playAudio('pick'); render();
+    }
+    function setOrderStar(id, n) { ORD_STAR[id] = n; render() }
+    function submitOrderRating(id, raterRole) {
+      const stars = ORD_STAR[id] || 5, comment = (vl('rat-txt-' + id) || '').trim();
+      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return;
+      if (!o.ratings) o.ratings = {};
+      o.ratings[raterRole] = { stars, comment: esc(comment), by: S.user || roleLabel(raterRole), at: new Date().toLocaleString() };
+      ordWrite(list);
+      const targetRoles = o.kind === 'pier_acquisition' ? ['checker', 'broker'] : ['broker', 'vendor'];
+      noteFor(targetRoles, 'Rating Submitted', `Rated ${o.cid} ${stars}/5 stars.`);
+      render();
+    }
+    function contactLinks(phone, who) {
+      const p = esc(phone || '0917-000-0000');
+      return `<div class="flex flex-wrap items-center gap-2 mt-2"><span class="text-xs text-slate-600"><b>${esc(who)}:</b> ${p}</span><a href="tel:${p}" onclick="playAudio('nav')" class="btn2 !py-1 !px-2.5 text-xs">📞 Call</a><a href="sms:${p}" onclick="playAudio('nav')" class="btn2 !py-1 !px-2.5 text-xs">💬 SMS</a></div>`;
+    }
+    function renderOrderQrCard(o, title, subtitle, rows) {
+      return `<div class="mt-3 p-3 rounded-xl border border-teal-200 bg-teal-50/70 grid sm:grid-cols-[128px,1fr] gap-3 items-center"><div class="qr-frame rounded-lg p-1.5 bg-white border border-slate-200 max-w-[128px] mx-auto w-full">${qrSvg(orderQrPayload(o))}</div><div class="text-xs space-y-1"><div class="font-mono font-bold text-teal-900 uppercase">${esc(title)}</div><div class="text-slate-600">${esc(subtitle)}</div><div class="pt-1 border-t border-teal-200/80 grid grid-cols-2 gap-x-3 gap-y-0.5">${rows.map(([k, v]) => `<div><span class="text-slate-500">${esc(k)}:</span> <b>${esc(v)}</b></div>`).join('')}</div></div></div>`;
+    }
+    function renderChatBox(o, channelTitle) {
+      const msgs = (o.chats || []).map(m => `<div class="text-xs p-2 rounded-lg mb-1.5 ${m.role === S.role ? 'bg-teal-50 border border-teal-200 ml-4' : 'bg-slate-100 mr-4'}"><div class="flex justify-between text-[0.6875rem] text-slate-500"><b>${esc(roleLabel(m.role))} (${esc(m.sender)})</b><span>${esc(m.at)}</span></div><div class="mt-0.5 text-sm">${m.text}</div></div>`).join('');
+      return `<div class="mt-3 border rounded-xl p-3 bg-slate-50"><div class="text-xs font-mono font-semibold text-slate-600 uppercase mb-2">💬 ${esc(channelTitle)}</div><div class="max-h-40 overflow-y-auto mb-2">${msgs || '<p class="text-xs text-slate-400">No messages yet. Start coordinating here.</p>'}</div><div class="flex gap-2"><input id="chat-in-${o.id}" class="inp !py-1.5 text-sm flex-1" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendOrderChat('${o.id}')"><button type="button" class="btn !w-auto px-4 !py-1.5" onclick="sendOrderChat('${o.id}')">Send</button></div></div>`;
+    }
+    function renderRatingForm(o, raterRole, targetLabel) {
+      const existing = o.ratings && o.ratings[raterRole];
+      if (existing) {
+        return `<div class="mt-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-sm"><div class="font-semibold text-emerald-900">★ ${existing.stars}/5 · Rated ${esc(targetLabel)}</div>${existing.comment ? `<p class="text-xs text-slate-700 mt-1">"${existing.comment}"</p>` : ''}<div class="text-[0.6875rem] text-slate-500 mt-1">${esc(existing.at)}</div></div>`;
+      }
+      const cur = ORD_STAR[o.id] || 5;
+      return `<div class="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50"><div class="text-xs font-mono font-semibold text-slate-600 uppercase">Rate ${esc(targetLabel)}</div><div class="flex gap-1 my-2">${[1, 2, 3, 4, 5].map(n => `<button type="button" onclick="setOrderStar('${o.id}',${n})" class="text-xl px-1 ${n <= cur ? 'text-amber-500' : 'text-slate-300'}" aria-label="${n} stars">★</button>`).join('')}<span class="text-xs font-mono self-center ml-2">${cur}/5</span></div><textarea id="rat-txt-${o.id}" rows="2" class="inp text-sm" placeholder="Leave feedback on quality, speed, or delivery..."></textarea><button type="button" class="btn mt-2" onclick="submitOrderRating('${o.id}','${raterRole}')">Submit Rating & Feedback</button></div>`;
+    }
+    async function cancelOrder(id) {
+      const list = ordRead(), o = list.find(x => x.id === id);
+      if (!o || (o.status !== 'Pending Approval' && o.status !== 'Pending Acceptance')) {
+        return toast('Cannot cancel order: it has already been approved or processed.', 1);
+      }
+      if (!await ask('Cancel this order?', `Cancel ${o.id} (${o.catchName}, ${o.kg} kg)? This cannot be undone.`, 'Cancel Order', 1)) return;
+      o.status = 'Cancelled';
+      o.updatedAt = new Date().toISOString();
+      ordWrite(list);
+      const targetRoles = o.kind === 'pier_acquisition' ? ['checker', 'broker'] : ['broker', 'vendor'];
+      noteFor(targetRoles, 'Order Cancelled', `${o.cid} (${o.id}) was cancelled by ${roleLabel(S.role)}.`);
+      render();
+    }
+    function openOrderQrModal(orderId) {
+      const o = ordRead().find(x => x.id === orderId);
+      if (!o) return toast('Order QR pass not found.', 1);
+      closeOrderQrModal();
+      const d = document.createElement('div');
+      d.id = 'ordQrLayer';
+      d.className = 'fixed inset-0 bg-[#0B0E17]/75 flex items-center justify-center p-4 z-50 overflow-y-auto';
+      d.innerHTML = `<div class="card w-full max-w-sm p-5 text-center" role="dialog" aria-modal="true"><div class="flex justify-between items-center mb-2"><span class="badge bg-teal-100 text-teal-800">${o.kind === 'pier_acquisition' ? 'Pier Hand-off QR' : 'Delivery QR Pass'}</span><button onclick="closeOrderQrModal()" aria-label="Close" class="text-2xl leading-none px-1">×</button></div><h2 class="font-mono font-bold text-lg">${esc(o.catchName)}</h2><div class="qr-frame rounded-xl p-2.5 mx-auto my-3 max-w-[240px] border border-slate-200 bg-white">${qrSvg(orderQrPayload(o))}</div><div class="text-left text-xs space-y-1">${kv('Order ID', esc(o.id))}${kv('Batch', esc(o.cid))}${kv('Weight', o.kg + ' kg')}${kv('Agreed Price', fmt(o.total))}${kv('Location', esc(o.kind === 'pier_acquisition' ? o.pierLocation : o.marketName))}</div><div class="flex flex-col sm:flex-row gap-2 mt-4"><button class="btn2 flex-1" onclick="dlOrderReceipt('${esc(o.id)}')">📄 Download Receipt</button><button class="btn flex-1" onclick="closeOrderQrModal()">Done</button></div></div>`;
+      document.body.append(d); trDom(d);
+    }
+    function closeOrderQrModal() { const d = $('#ordQrLayer'); if (d) d.remove(); }
+    function dlOrderReceipt(orderId) {
+      const o = ordRead().find(x => x.id === orderId);
+      if (!o) return toast('Order record not found.', 1);
+      const S2 = 2, W = 640, H = 440, cv = document.createElement('canvas');
+      cv.width = W * S2; cv.height = H * S2;
+      const x = cv.getContext('2d'); x.scale(S2, S2); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+      const SANS = '"Segoe UI",Roboto,Arial,sans-serif', MONO = '"Courier New",monospace'; let y = 46;
+      x.fillStyle = '#0B4A5D'; x.font = 'bold 26px ' + SANS; x.textAlign = 'center'; x.fillText('DEAL Navotas', W / 2, y); y += 24;
+      x.font = '14px ' + SANS; x.fillStyle = '#475569'; x.fillText(o.kind === 'pier_acquisition' ? 'Digital Hand-off Receipt' : 'Official Purchase Receipt', W / 2, y); y += 22;
+      const line = () => { x.strokeStyle = '#cbd5e1'; x.setLineDash([5, 4]); x.beginPath(); x.moveTo(32, y); x.lineTo(W - 32, y); x.stroke(); x.setLineDash([]); y += 24 };
+      const row = (l, v) => { x.textAlign = 'left'; x.fillStyle = '#64748b'; x.font = '14px ' + SANS; x.fillText(l, 32, y); x.textAlign = 'right'; x.fillStyle = '#0B0E17'; x.font = 'bold 14px ' + MONO; x.fillText(String(v), W - 32, y); y += 28 };
+      line();
+      row('Order ID', o.id + (o.passId ? ' · ' + o.passId : ''));
+      row('Batch / Species', o.cid + ' · ' + o.catchName);
+      row('Tubs / Weight', (o.tubs || 1) + ' tub(s) · ' + o.kg + ' kg');
+      row('Destination', o.kind === 'pier_acquisition' ? o.pierLocation : o.marketName);
+      row('Timestamp', new Date(o.updatedAt || o.createdAt).toLocaleString());
+      row('Escrow Status', o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held'));
+      line();
+      x.textAlign = 'left'; x.fillStyle = '#0B0E17'; x.font = 'bold 18px ' + SANS; x.fillText('Agreed Total', 32, y + 4);
+      x.textAlign = 'right'; x.fillStyle = '#059669'; x.font = 'bold 22px ' + MONO; x.fillText('₱' + fmt(o.total).replace(/^₱/, ''), W - 32, y + 4);
+      cv.toBlob(bl => {
+        if (!bl) return toast('Could not generate receipt.', 1);
+        const u = URL.createObjectURL(bl), a = document.createElement('a');
+        a.href = u; a.download = 'deal-receipt-' + o.id + '.png'; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(u), 3000);
+        toast('Receipt downloaded.');
+      }, 'image/png');
+    }
+    async function clearAllOrders() {
+      if (!await ask('Clear all order records?', 'This removes all local order, chat, and rating records on this browser. Run supabase_clear_records.sql in Supabase to clear database catches and passes too.', 'Clear Orders', 1)) return;
+      ordWrite([]);
+      toast('Local order records cleared.');
+      render();
+    }
+    function ordersV() {
+      const all = ordRead(), r = S.role;
+      let scoped = all.filter(o => r === 'checker' ? o.kind === 'pier_acquisition' : r === 'vendor' ? o.kind === 'vendor_sale' : true);
+      const tabMatch = {
+        all: () => true,
+        receive: o => r === 'checker' ? o.status === 'Accepted' : r === 'vendor' ? (o.status === 'Accepted' || o.status === 'In Transit') : (o.status === 'Accepted' || o.status === 'In Transit'),
+        rate: o => o.status === 'Delivered'
+      };
+      const counts = { all: scoped.length, receive: scoped.filter(tabMatch.receive).length, rate: scoped.filter(tabMatch.rate).length };
+      const list = scoped.filter(tabMatch[ORD_TAB] || tabMatch.all);
+      const subTabs = [['all', `All Orders (${counts.all})`], ['receive', `To Receive / Passes (${counts.receive})`], ['rate', `To Rate (${counts.rate})`]];
+      return h1('Orders', 'Manage pier acquisitions, market sales, QR pass verification, live chat, and ratings.')
+        + `<div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-4"><div class="flex flex-wrap gap-2" role="tablist" aria-label="Order sub-tabs">${subTabs.map(([k, l]) => `<button role="tab" aria-selected="${ORD_TAB === k}" class="pill border ${ORD_TAB === k ? 'on' : ''}" onclick="ORD_TAB='${k}';playAudio('nav');render()">${l}</button>`).join('')}</div>${all.length ? `<button type="button" class="btn2 !py-2 !px-3 text-xs !border-red-300 text-red-700" onclick="clearAllOrders()">🗑️ Clear Orders</button>` : ''}</div>`
+        + (list.length ? list.map(o => {
+          const isAcq = o.kind === 'pier_acquisition';
+          const badgeRow = `${r === 'broker' ? kindBadge(o.kind) + ' ' : ''}${ordBadge(o.status)}`;
+          const tubsCount = o.tubs || Math.max(1, Math.ceil((+o.kg || 1) / 25));
+          const tsStr = new Date(o.updatedAt || o.createdAt).toLocaleString();
+          let body = '', actions = '', recvLayout = '', chat = '', rate = '';
+          if (isAcq) {
+            body = `<div class="text-xs text-slate-600 mt-1">Pier Dock: <b>${esc(o.pierLocation)}</b> · Broker: <b>${esc(o.brokerIdent)}</b> · Total: <b class="font-mono">${fmt(o.total)}</b> · Escrow: <b>${esc(o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held'))}</b></div>`;
+            if (ORD_TAB === 'all' && o.status === 'Pending Acceptance') {
+              if (r === 'checker') {
+                actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1" onclick="acceptPierBid('${o.id}')">✓ Accept Bid</button><button class="btn2 flex-1 !border-red-300 text-red-700" onclick="rejectPierBid('${o.id}')">✕ Reject Bid</button></div>`;
+              } else if (r === 'broker') {
+                actions = `<div class="mt-3"><button class="btn2 !border-red-300 text-red-700" onclick="cancelOrder('${o.id}')">✕ Cancel Order</button></div>`;
+              }
+            }
+            if ((ORD_TAB === 'receive' || ORD_TAB === 'all') && o.status === 'Accepted') {
+              const contactHtml = r === 'checker' ? contactLinks(o.brokerPhone, 'Broker Contact') : contactLinks(o.checkerPhone, 'Pier Checker Contact');
+              const leftCol = `<div class="space-y-1 text-xs text-slate-700"><div class="font-mono font-semibold text-slate-500 uppercase">Receiving Area · Passes & Ledges</div><div><b>Species:</b> ${esc(o.catchName)} · <b>Tubs:</b> ${tubsCount} · <b>Total Weight:</b> ${o.kg} kg</div><div><b>Agreed Price:</b> <span class="font-mono font-bold text-[#0B4A5D]">${fmt(o.total)}</span> · <b>Dock:</b> ${esc(o.pierLocation)}</div><div><b>Timestamp:</b> ${esc(tsStr)}</div>${contactHtml}</div>`;
+              const rightCol = `<div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52">${r === 'broker' ? `<button class="btn" onclick="openOrderQrModal('${o.id}')">🎟️ View QR Code</button>` : `<button class="btn" onclick="openOrderScanner('${o.id}','pier')">📷 Scan QR Release Pass</button>`}<button class="btn2" onclick="dlOrderReceipt('${o.id}')">📄 Download Receipt</button></div>`;
+              recvLayout = `<div class="mt-3 p-3 rounded-xl border border-teal-200 bg-teal-50/50 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">${leftCol}${rightCol}</div>`;
+              if (ORD_TAB === 'receive') chat = renderChatBox(o, 'Pier Checker ↔ Broker Chat');
+            }
+            if (ORD_TAB === 'rate' && o.status === 'Delivered') {
+              rate = renderRatingForm(o, r, r === 'checker' ? 'Consignee Broker' : 'Pier Checker (Quality & Dock Speed)');
+            }
+          } else {
+            body = `<div class="text-xs text-slate-600 mt-1">Destination: <b>${esc(o.marketName)}</b>${o.stallNote ? ' (' + esc(o.stallNote) + ')' : ''} · Fulfillment: <b>${o.fulfillment === 'broker_delivery' ? 'Broker Transport' : 'Pier Self-Pickup'}</b> · Total: <b class="font-mono">${fmt(o.total)}</b> · Escrow: <b>${esc(o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held'))}</b></div>`;
+            if (o.vehicle) body += `<div class="rounded-lg bg-slate-50 border border-slate-200 p-2.5 mt-2 text-xs"><b>Vehicle:</b> ${esc(o.vehicle.vehicleType)} (${esc(o.vehicle.plateNo)}) · <b>Driver:</b> ${esc(o.vehicle.driverName)} (${esc(o.vehicle.contactNo)})${o.route ? ` · <b>ETA:</b> ${esc(o.route.etaText)}` : ''}</div>`;
+            if (ORD_TAB === 'all' && o.status === 'Pending Approval') {
+              if (r === 'broker') {
+                actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1" onclick="acceptVendorOrder('${o.id}')">✓ Accept Order</button><button class="btn2 flex-1 !border-red-300 text-red-700" onclick="rejectVendorOrder('${o.id}')">✕ Reject Order</button></div>`;
+              } else if (r === 'vendor') {
+                actions = `<div class="mt-3"><button class="btn2 !border-red-300 text-red-700" onclick="cancelOrder('${o.id}')">✕ Cancel Order</button></div>`;
+              }
+            }
+            if ((ORD_TAB === 'receive' || ORD_TAB === 'all') && (o.status === 'Accepted' || o.status === 'In Transit')) {
+              const contactHtml = r === 'broker' ? contactLinks(o.vendorPhone, 'Micro-Vendor Contact') : contactLinks(o.brokerPhone, 'Broker Contact');
+              const leftCol = `<div class="space-y-1 text-xs text-slate-700"><div class="font-mono font-semibold text-slate-500 uppercase">Receiving Area · Passes & Ledges</div><div><b>Species:</b> ${esc(o.catchName)} · <b>Tubs:</b> ${tubsCount} · <b>Total Weight:</b> ${o.kg} kg</div><div><b>Agreed Price:</b> <span class="font-mono font-bold text-[#0B4A5D]">${fmt(o.total)}</span> · <b>Market:</b> ${esc(o.marketName)}</div><div><b>Timestamp:</b> ${esc(tsStr)}</div>${contactHtml}</div>`;
+              const rightCol = `<div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52">${r === 'vendor' ? `<button class="btn" onclick="openOrderQrModal('${o.id}')">🎟️ View QR Code</button>` : `<button class="btn" onclick="openOrderScanner('${o.id}','market')">📷 Scan Market Delivery QR</button>`}<button class="btn2" onclick="dlOrderReceipt('${o.id}')">📄 Download Receipt</button></div>`;
+              recvLayout = `<div class="mt-3 p-3 rounded-xl border border-teal-200 bg-teal-50/50 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">${leftCol}${rightCol}</div>`;
+              if (ORD_TAB === 'receive' && r === 'broker' && o.status === 'Accepted' && o.fulfillment === 'broker_delivery') {
+                actions = `<div class="mt-3 p-3 rounded-xl border border-amber-300 bg-amber-50"><div class="text-xs font-mono font-semibold text-amber-900 uppercase mb-2">Assign Broker Transport Fleet</div><div class="grid sm:grid-cols-2 gap-2"><input id="drv-${o.id}" class="inp" placeholder="Driver Name"><select id="veh-${o.id}" class="inp">${Object.keys(FLEET_TYPES).map(v => `<option>${v}</option>`).join('')}</select><input id="plt-${o.id}" class="inp" placeholder="Plate # / Vehicle ID"><input id="cnt-${o.id}" class="inp" placeholder="Driver Contact #"></div><button class="btn mt-2" onclick="dispatchVendorOrder('${o.id}')">🚚 Assign Vehicle & Mark In Transit</button></div>`;
+              }
+              if (ORD_TAB === 'receive') chat = renderChatBox(o, 'Broker ↔ Micro-Vendor Chat');
+            }
+            if (ORD_TAB === 'rate' && o.status === 'Delivered') {
+              rate = renderRatingForm(o, r, r === 'vendor' ? 'Broker & Delivery Service' : 'Micro-Vendor');
+            }
+          }
+          return `<div class="card p-4 mb-3"><div class="flex flex-col sm:flex-row justify-between gap-2 items-start"><div><div class="font-mono text-xs text-slate-500">${esc(o.id)} · ${esc(o.cid)}${o.passId ? ' · ' + esc(o.passId) : ''}</div><h3 class="font-bold text-lg">${esc(o.catchName)} <span class="font-mono text-sm font-normal text-slate-500">(${o.kg} kg)</span></h3></div><div class="flex flex-wrap gap-1.5 items-center">${badgeRow}</div></div>${body}${recvLayout}${actions}${chat}${rate}</div>`;
+        }).join('') : `<div class="card p-6 text-center text-slate-500">No orders in this sub-tab yet.</div>`);
+    }
+
     // ---> role-based workspace routing <---
     //-> Function: view()
     //-> Selects the workspace renderer for S.tab and S.role, including empty-catch guidance for the current section.
     function view() {
       const t = S.tab;
-      if (!S.catches.length && !['intake', 'sync', 'passes', 'history', 'sold'].includes(t) && !(t === 'quality' && S.role === 'checker')) return h1('No catches yet', 'Waiting for a Pier Checker to log the first landing.');
-      if (t === 'history') return histV(); if (t === 'sold') return soldV(); if (t === 'floor') return floor(0); if (t === 'hati') return floor(1); if (t === 'taripa') return taripaV(); if (t === 'sync') return syncV(); if (t === 'passes') return passes();
+      if (!S.catches.length && !['intake', 'sync', 'passes', 'history', 'sold', 'orders'].includes(t) && !(t === 'quality' && S.role === 'checker')) return h1('No catches yet', 'Waiting for a Pier Checker to log the first landing.');
+      if (t === 'history') return histV(); if (t === 'sold') return soldV(); if (t === 'orders') return ordersV(); if (t === 'floor') return floor(0); if (t === 'hati') return floor(1); if (t === 'taripa') return taripaV(); if (t === 'sync') return syncV(); if (t === 'passes') return passes();
       if (t === 'intake') return intake(); if (t === 'auction') return auction();
-      if (t === 'quality') return S.role === 'checker' ? register() : h1('Suri-Isda Quality Guard', 'Inspection status of every batch on the floor.') + `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${S.catches.map(c => cardC(c, 0)).join('')}</div>`
+      if (t === 'quality') { const ql = S.role === 'vendor' ? S.catches.filter(vendorReady) : S.catches; return S.role === 'checker' ? register() : h1('Suri-Isda Quality Guard', 'Inspection status of every batch on the floor.') + (ql.length ? `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${ql.map(c => cardC(c, 0)).join('')}</div>` : '<p class="text-slate-500">No broker-won catches are on the floor right now.</p>') }
     }
     // ---> notifications, sidebar, tutorial, and inspection tools <---
     const IR = /^((?:\p{Extended_Pictographic}|[✓✔])\uFE0F?\s)/u;
@@ -2634,7 +3202,17 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     // ---> notifications and sidebar menu <---
     //-> Function: note(title, body, quiet)
     //-> Adds a notification to in-memory state, caps history at 40, updates the unread count, and refreshes an open panel.
-    function note(title, body, q) { playChime(); if (TTS.alerts) TTS.speak(tr(title) + '. ' + tr(body), 'alert'); S.notes.unshift({ title, body, t: new Date().toLocaleTimeString() }); S.notes = S.notes.slice(0, 40); if (!S.nd) S.unread++; if (!q) toast(title + ': ' + body, 0, 1); if (S.nd) render() }
+    const NOTIF_K = 'deal-notif-v1';
+    function note(title, body, q) { if (TTS.alerts) TTS.speak(tr(title) + '. ' + tr(body), 'alert'); S.notes.unshift({ title, body, t: new Date().toLocaleTimeString() }); S.notes = S.notes.slice(0, 40); if (!S.nd) S.unread++; if (!q) toast(title + ': ' + body, 0, 1); if (S.nd) render() }
+    function noteFor(roles, title, body, q) {
+      if (!roles || roles.includes(S.role)) note(title, body, q);
+      try { localStorage.setItem(NOTIF_K, JSON.stringify({ id: Date.now() + Math.random(), roles: roles || ['checker', 'broker', 'vendor'], title, body, fromRole: S.role })) } catch (e) { }
+    }
+    addEventListener('storage', e => {
+      if (e.key === NOTIF_K && e.newValue && S.user) {
+        try { const p = JSON.parse(e.newValue); if (p && (!p.roles || p.roles.includes(S.role))) note(p.title, p.body) } catch (err) { }
+      }
+    });
     //-> Function: toggleND()
     //-> Opens or closes the notification panel, clears unread count when opened, and re-renders the interface.
     function toggleND() { S.nd = !S.nd; if (S.nd) S.unread = 0; render() }
@@ -2656,9 +3234,9 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
 <button data-tour="sound" class="sbb" onclick="togSound()"><span>${S.mute ? '🔇 Sound off' : '🔊 Sound on'}</span></button></div>
 <div class="my-auto py-6"><button data-k="logout" onclick="run(this,'Signing out…',()=>{S.sb=false;return logout()})" class="btn2 w-full !border-red-300 text-red-700 font-semibold">Sign Out</button></div></aside></div>`;
     const TOURS = {
-      vendor: [['floor', 'nav', 'Navigation cards', 'Tap a card to move between Fresh Catches Floor, Taripa Calculator, Suri-Isda Guard, Offline Sync and Passes & Ledger.'], ['floor', '.ni-reef', 'Fresh Catches Floor', 'Everything landed at the pier today. Browse by category, or tap Hati-Hati Banyera to see only tubs that are already being shared.'], ['floor', 'article', 'Pick a catch', 'Each card shows the price per kg and how much of the tub is still open.'], ['floor', 'article button.btn', 'Hati-Hati portion', 'Tap Claim Portion, then use − / + or the quick chips to set your kilos.'], ['taripa', '.card.p-5', 'Taripa Calculator', 'Pick a catch and your kilos to see the base price, port fee, commission and total payable before you commit.'], ['quality', 'main', 'Suri-Isda Guard', 'See the inspection status of every batch. Only Suri-Isda verified lots can be claimed.'], ['sync', 'main', 'Offline Sync', 'Claims made without signal wait here until you sync. You can remove a saved claim before it goes through.'], ['passes', 'main', 'Passes & Ledger', 'After you confirm, an escrow QR pass is made. Show it at pickup and track your payments here.']],
-      checker: [['intake', 'nav', 'Navigation bar', 'Switch between catches, Taripa, quality checks and your passes here.'], ['intake', 'form', 'Dockside intake', 'Log each landing: name, weight, tubs, prices and three photos. The AI inspects them when you submit.'], ['intake', '#evp0', '3-angle proof', 'Capture front, middle and bottom photos. The AI uses them to run the checklist, give the freshness score and pass or flag the lot.'], ['quality', 'main', 'Validation register', 'Every inspection is listed here with its evidence.']],
-      broker: [['auction', 'main table', 'Live bidding', 'Bids refresh by themselves. The bell alerts you when you are outbid.'], ['auction', '.card.p-5', 'Taripa breakdown', 'See base price, port fee, commission and total payable for the lot.'], ['passes', '[data-k=scan]', 'Escrow QR scanner', 'Scan the vendor pass at pickup to verify it and release escrow.'], ['passes', 'main', 'Escrow release', 'Approve a manual release only when a scan is not possible.']]
+      vendor: [['floor', 'nav', 'Navigation cards', 'Tap a card to move between Fresh Catches Floor, Taripa Calculator, Offline Sync, and Orders.'], ['floor', '.ni-reef', 'Fresh Catches Floor', 'Everything landed at the pier today. Browse by category, or tap Hati-Hati Banyera to see only tubs that are already being shared.'], ['floor', 'article', 'Pick a catch', 'Each card shows the price per kg and how much of the tub is still open.'], ['floor', 'article button.btn', 'Hati-Hati portion', 'Tap Claim Portion, then use − / + or the quick chips to set your kilos.'], ['taripa', '.card.p-5', 'Taripa Calculator', 'Pick a catch and your kilos to see the base price, port fee, commission and total payable before you commit.'], ['sync', 'main', 'Offline Sync', 'Claims made without signal wait here until you sync. You can remove a saved claim before it goes through.'], ['orders', 'main', 'Orders', 'Track your active orders, view your Delivery QR Pass & Official Receipt, chat with your Broker, and rate completed deliveries.']],
+      checker: [['intake', 'nav', 'Navigation bar', 'Switch between Fish Log Floor, Validation Register, Offline Sync, and Orders here.'], ['intake', 'form', 'Dockside intake', 'Log each landing: name, weight, tubs, prices and three photos. The AI inspects them when you submit.'], ['intake', '#evp0', '3-angle proof', 'Capture front, middle and bottom photos. The AI uses them to run the checklist, give the freshness score and pass or flag the lot.'], ['quality', 'main', 'Validation register', 'Every inspection is listed here with its evidence.'], ['orders', 'main', 'Orders', 'Accept winning bids, scan the Broker QR Release Pass at the dock, and rate hand-offs.']],
+      broker: [['auction', 'main table', 'Live bidding', 'Bids refresh by themselves. The bell alerts you when you are outbid.'], ['auction', '.card.p-5', 'Taripa breakdown', 'See base price, port fee, commission and total payable for the lot.'], ['orders', 'main', 'Orders & QR Verification', 'View your Pier Acquisition QR Passes, dispatch delivery fleet to market vendors, and scan Market Delivery QR codes.']]
     };
     // ---> guided workspace tutorial <---
     //-> Function: startTour()
@@ -2831,8 +3409,16 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
        ongoing      = a cash (or unrecorded-payment) pass on the lot is still waiting for its QR scan (server flag, set by the database).
        offFloor     = nobody can claim or bid: fully claimed, OR a transaction is on-going. An on-going lot returns to the floor if the scan leaves portions open.
        soldOut      = fully claimed AND nothing is waiting any more: cashless is paid, cash was scanned. */
-    const fullyClaimed = c => !!c && (!!c.closed || !!c.sold_out || (c.tubs != null && +c.tubs <= 0) || (+c.tubs <= 1 && +c.claimed >= +c.kg));
-    const taken = c => !!c && ((c.tubs != null && +c.tubs <= 0) || (+c.tubs <= 1 && +c.claimed >= +c.kg));
+    const remainingTubs = c => {
+      if (!c) return 0;
+      if (c.remaining_tubs != null) return Math.max(0, +c.remaining_tubs);
+      if (c.closed || c.sold_out) return 0;
+      if (c.tubs != null && +c.tubs <= 0) return 0;
+      if (+c.tubs <= 1 && +c.claimed >= +c.kg - 1e-9) return 0;
+      return Math.max(0, +c.tubs || 0);
+    };
+    const fullyClaimed = c => !!c && remainingTubs(c) === 0;
+    const taken = c => !!c && remainingTubs(c) === 0;
     const ongoing = c => !!c && !c.closed && !c.sold_out && c.ongoing === true && !taken(c);
     const offFloor = c => fullyClaimed(c) || ongoing(c);
     const ONGMSG = 'A transaction on this lot is on-going. It can be claimed again once the cash pickup QR is scanned.';
@@ -2884,6 +3470,21 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
         ev.push({ k: 'claim', ts: p.created_at, id: p.id, ref: p.cid, title: p.name, qty: `${p.kg} kg`, price: pr, total: +p.total, note: p.status === 'escrow' ? ((p.pay || payOf(p) || {}).method === 'cashless' ? 'Paid online (cashless)' : 'Cash · waiting for the QR scan') : 'Payment released' });
         if (p.status === 'released') ev.push({ k: 'delivered', ts: p.scanned_at || p.created_at, id: p.id, ref: p.cid, title: p.name, qty: `${p.kg} kg`, price: pr, total: +p.total, note: p.scanned_at ? 'Verified by QR scan' : 'Released by broker' })
       });
+      ordRead().filter(o => o.status === 'Delivered' && (S.role === 'checker' ? o.kind === 'pier_acquisition' : S.role === 'vendor' ? o.kind === 'vendor_sale' : true)).forEach(o => {
+        const rs = Object.entries(o.ratings || {}).filter(([, v]) => v).map(([rk, v]) => `${roleLabel(rk)}: ${v.stars}★`).join(' · ');
+        ev.push({
+          k: 'delivered',
+          ts: o.qrVerifiedAt || o.updatedAt || o.createdAt,
+          id: o.id,
+          ref: o.passId || o.cid,
+          title: o.catchName + (o.kind === 'pier_acquisition' ? ' (Pier Hand-off)' : ' (Market Delivery)'),
+          qty: `${o.kg} kg`,
+          price: o.pricePerKg || null,
+          total: +o.total,
+          note: `QR Verified by ${o.qrVerifiedBy || 'Authorized Scanner'} · ${o.escrowStatus || 'Escrow Released'}${rs ? ' · ' + rs : ''}`,
+          who: o.kind === 'pier_acquisition' ? `Dock: ${o.pierLocation}` : `Market: ${o.marketName}`
+        });
+      });
       return ev.sort((a, b) => tsn(b.ts) - tsn(a.ts))
     }
     function histV() {
@@ -2923,8 +3524,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
         [t, '[data-tour=sound]', 'Sound on / off', 'Mute or unmute alert sounds and the chime. Your choice is remembered.', 1],
         [t, '[data-k=logout]', 'Sign Out', 'Ends your session. You are also signed out automatically after 15 minutes idle.', 1],
         [t, 'nav', 'Main navigation tabs', 'Move between your sections, including Sold Out / Closed. On a phone, swipe the bar sideways to see every tab.']];
-      const X = t => [['history', 'main', 'Sales History', 'Open it from the menu (sidebar). Auctions, claims, payments and deliveries are logged here with time, quantity and price. Use the filters to narrow the list.'],
-      ['sold', 'main', 'Sold Out / Closed Catches', 'A lot leaves Fresh Catches as soon as every portion is claimed. While a cash claim waits for its QR scan the lot shows On-going transaction and cannot be claimed; cashless claims are Sold out once paid.']];
+      const X = t => [['history', 'main', 'Sales History', 'Open it from the menu (sidebar). Auctions, QR-verified hand-offs, receipts, and ratings are logged here with time, quantity and price. Use the filters to narrow the list.']];
       for (const r of Object.keys(TOURS)) { const t = TABS[r][0][0]; TOURS[r] = [...H(t), ...TOURS[r].filter(x => x[1] !== 'nav'), ...X(t)] }
       [['Sales History', 'Kasaysayan ng Benta', 'Sales History'], ['Sold Out / Closed', 'Naubos / Sarado', 'Sold Out / Closed'], ['Transaction / Sales History', 'Kasaysayan ng Transaksyon / Benta', 'Transaction / Sales History'], ['Sold Out / Closed Catches', 'Naubos / Saradong Huli', 'Sold Out / Closed na Huli'], ['Claimed & Paid', 'Nakuha at Bayad', 'Claimed at Paid'], ['Delivered', 'Naihatid', 'Delivered'], ['Sold Out', 'Naubos', 'Sold Out'], ['Transactions', 'Mga Transaksyon', 'Transactions'], ['Total paid', 'Kabuuang bayad', 'Total paid'], ['Kg claimed', 'Kg na nakuha', 'Kg claimed'], ['Remember this device', 'Tandaan ang device na ito', 'Tandaan ang device na ito'], ['CONTINUE TO PAYMENT', 'magpatuloy sa bayad'.toUpperCase(), 'MAGPATULOY SA PAYMENT'], ['Payment method', 'Paraan ng pagbabayad', 'Payment method'], ['Cash', 'Cash', 'Cash'], ['Cashless', 'Cashless', 'Cashless'], ['Hand the exact amount to the broker at dockside pickup.', 'Iabot ang eksaktong halaga sa broker sa pickup sa pantalan.', 'I-abot ang exact amount sa broker sa dockside pickup.'], ['E-wallet or card payment.', 'Bayad gamit ang e-wallet o card.', 'E-wallet o card payment.'], ['This cashless payment is for demo only. No real money is charged.', 'Pang-demo lamang ang cashless na bayad na ito. Walang totoong pera na sisingilin.', 'Pang-demo lang ang cashless payment na ito. Walang totoong pera na ica-charge.'], ['Total payable', 'Kabuuang babayaran', 'Total payable'], ['Download receipt', 'I-download ang resibo', 'I-download ang receipt'], ['Back', 'Bumalik', 'Back']].forEach(a => { if (!DT[a[0]]) LT(a[0], a[1], a[2]) })
     })();
@@ -2938,6 +3538,8 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     /* broker winning-bid payment: Tagalog / Taglish strings */
     [['Winning bid payment', 'Bayad sa nanalong taya', 'Payment sa winning bid'], ['Pay the exact amount in cash at the port.', 'Bayaran ang eksaktong halaga nang cash sa pantalan.', 'Bayaran ang exact amount in cash sa pantalan.'], ['Pay later', 'Magbayad mamaya', 'Mag-pay later'], ['Pay amount', 'Bayaran ang halaga', 'Bayaran ang amount'], ['Processing payment…', 'Pinoproseso ang bayad…', 'Piniprocess ang payment…'], ['Payment received. Your receipt is ready.', 'Natanggap na ang bayad. Handa na ang iyong resibo.', 'Received na ang payment. Ready na ang receipt mo.'], ['Payment received', 'Natanggap na ang bayad', 'Received na ang payment'], ['Choose payment method', 'Pumili ng paraan ng pagbabayad', 'Pumili ng payment method'], ['You won this lot', 'Nanalo ka sa lote na ito', 'Nanalo ka sa lot na ito'], ['Payment due', 'Kailangang bayaran', 'Payment due'], ['Final bid paid', 'Bayad na ang huling taya', 'Bayad na ang final bid'], ['Paid', 'Bayad na', 'Paid na'], ['Won auctions · final bid payment', 'Mga napanalunang subasta · bayad sa huling taya', 'Mga napanalunang auction · payment sa final bid'], ['Receipt no.', 'Blg. ng resibo', 'Receipt no.'], ['Winning bid', 'Nanalong taya', 'Winning bid'], ['Weight', 'Timbang', 'Weight'], ['Payment', 'Bayad', 'Payment'], ['Reference', 'Reperensya', 'Reference'], ['Cashless (demo)', 'Cashless (demo)', 'Cashless (demo)'], ['Not recorded', 'Hindi naitala', 'Hindi naitala'], ['Receipt downloaded.', 'Na-download na ang resibo.', 'Na-download na ang receipt.'], ['Could not create the receipt.', 'Hindi nagawa ang resibo.', 'Hindi nagawa ang receipt.'], ['No payment found for this lot.', 'Walang bayad na nakita para sa lote na ito.', 'Walang payment na nakita para sa lot na ito.'], ['Catch', 'Huli', 'Catch'], ['Total paid', 'Kabuuang bayad', 'Total paid']].forEach(a => { if (!DT[a[0]]) LT(a[0], a[1], a[2]) });
     RULES.push([/^Pay amount · (.+)$/, 'Bayaran ang halaga · $1', 'Bayaran ang amount · $1']);
+    /* unified orders system: authentic Tagalog / Taglish wet-market & consignation terms */
+    [['Orders', 'Mga Order', 'Orders'], ['All Orders', 'Lahat ng Order', 'All Orders'], ['To Receive', 'Tatanggapin', 'To Receive'], ['To Rate', 'Bibigyan ng Rating', 'To Rate'], ['Pending Acceptance', 'Naghihintay ng Pagtanggap', 'Pending Acceptance'], ['Pending Approval', 'Naghihintay ng Pag-apruba', 'Pending Approval'], ['Accepted', 'Tinanggap', 'Accepted'], ['In Transit', 'Nasa Biyahe', 'In Transit'], ['Delivered', 'Naihatid na', 'Delivered'], ['Rejected', 'Tinanggihan', 'Rejected'], ['Direct Delivery by Broker Transport', 'Direktang Hatid ng Sasakyan ng Consignee', 'Direct Delivery ng Broker Transport'], ['Self-Pickup at the Pier Dock', 'Sariling Kuha sa Bagsakan / Pier', 'Self-Pickup sa Pier Dock'], ['Show password', 'Ipakita ang password', 'Ipakita ang password'], ['Hide password', 'Itago ang password', 'Itago ang password']].forEach(a => { if (!DT[a[0]]) LT(a[0], a[1], a[2]) });
     // ---> sign-in overlay and application rendering <---
     let signKey = '', signOpener = null;
     //-> Function: paintSign()
@@ -2960,7 +3562,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       requestAnimationFrame(focusFix); if (S.user) S.go = false; save(); prefsPush();
       if (S.user && S.tutDue && !S.newId && !S.tour && !S.pm && !S.pay && !S.pass && !S.bp && !S.br) { S.tutDue = false; S.tour = { i: 0 }; S.tab = TOURS[S.role][0][0] }
       if (S.tour && TOURS[S.role] && TOURS[S.role][S.tour.i]) { S.sb = !!TOURS[S.role][S.tour.i][4]; S.nd = false }
-      document.body.classList.toggle('touring', !!S.tour); paintSign(); document.documentElement.classList.toggle('dark', S.dark); const a = $('#app');
+      document.body.classList.toggle('touring', !!S.tour); paintSign(); document.documentElement.classList.toggle('dark', S.dark); document.documentElement.classList.toggle('light', !S.dark); const a = $('#app');
       if (!S.user) { const y0 = scrollY; a.innerHTML = landing(); trDom(a); scrollTo(0, y0); revealInit(); paintBusy(); if (!S.go && (!document.activeElement || document.activeElement === document.body)) { const c = $('#cta'); c && c.focus({ preventScroll: true }) } return }
       a.innerHTML = head() + nav() + `<main class="max-w-6xl mx-auto p-4 pb-28">${view()}</main>` + bottom() + idModal() + evModal() + portionModal() + payModal() + bpModal() + brModal() + passModal() + sbModal() + ndModal() + tourUI(); if (S.tab === 'taripa') calc(); iconify(a); trDom(a); paintBusy(); evChk(); navFix(); requestAnimationFrame(tourPos); if (S.tour) setTimeout(tourPos, 320)
     }
