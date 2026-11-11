@@ -1695,7 +1695,7 @@
  <h2 class="font-mono font-bold text-xl mt-2">Sign In: DEAL Port Access</h2><p class="text-sm text-slate-500 keep-c">Authorized sign-in for micro-vendors, checkers, and consignee brokers</p>
  <div class="grid grid-cols-3 gap-1 bg-slate-100 border border-slate-300 p-1 rounded-xl my-4" role="tablist">${[['vendor', 'Micro-Vendor'], ['checker', 'Pier Checker'], ['broker', 'Consignee Broker']].map(([r, l]) => `<button onclick="LR='${r}';paintSign()" role="tab" aria-selected="${LR === r}" class="py-2 rounded-lg text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-[#006878] ${LR === r ? 'bg-[#006878] text-white' : ''}">${l}</button>`).join('')}</div>
  ${sb ? '' : '<p class="text-sm bg-amber-50 border border-amber-300 rounded-lg p-3">Setup needed: add your Supabase URL and anon key to config.js.</p>'}
- ${AM === 'up' && LR !== 'vendor' ? `<label class="lbl">Full name</label><input id="f0" class="inp" maxlength="80" autocomplete="name"><p class="text-xs text-slate-500 mt-2">We will create your ID for you when you finish.</p>` : `${AM === 'up' ? `<label class="lbl">Full name</label><input id="f0" class="inp" maxlength="80" autocomplete="name" placeholder="e.g. Juan Dela Cruz">` : ''}<label class="lbl">${LBL[LR][0]}</label><input id="f1" class="inp" placeholder="${LBL[LR][1]}" autocomplete="username" ${SAVED && AM === 'in' && !S.diff ? `value="${esc(SAVED.ident)}"` : ''}>${SAVED && AM === 'in' ? `<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mt-2 text-xs"><span class="text-slate-600">${S.diff ? 'Using a different account' : 'Saved account on this device'}</span><span class="flex gap-3">${S.diff ? `<button type="button" class="font-semibold text-[#006878] underline" onclick="S.diff=false;S.accRev=(S.accRev||0)+1;paintSign()">Use saved account</button>` : `<button type="button" class="font-semibold text-[#006878] underline" onclick="S.diff=true;S.accRev=(S.accRev||0)+1;paintSign()">Use a different account</button>`}<button type="button" class="font-semibold text-[#006878] underline" onclick="accForget(LR)">Forget</button></span></div>` : ''}`}
+ ${AM === 'up' && LR !== 'vendor' ? `<label class="lbl">Full name</label><input id="f0" class="inp" maxlength="80" autocomplete="name"><p class="text-xs text-slate-500 mt-2">We will create your ID for you when you finish.</p>` : `${AM === 'up' ? `<label class="lbl">Full name</label><input id="f0" class="inp" maxlength="80" autocomplete="name" placeholder="e.g. Juan Dela Cruz">` : ''}<label class="lbl">${LBL[LR][0]}</label><input id="f1" class="inp" placeholder="${LBL[LR][1]}" autocomplete="username" ${SAVED && AM === 'in' ? `value="${esc(SAVED.ident)}"` : ''}>`}
  <label class="lbl">Password</label><div class="relative"><input id="f2" type="password" class="inp !pr-11" autocomplete="${AM === 'up' ? 'new-password' : 'current-password'}" placeholder="${AM === 'up' ? '8+ characters, letters and numbers' : ''}"><button type="button" onclick="togglePw('f2',this)" aria-label="Show password" aria-pressed="false" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-500 hover:text-[#006878]" title="Show/hide password"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
  ${AM === 'up' && LR !== 'vendor' ? `<label class="lbl">${LR === 'checker' ? 'Assigned Dockside Pier Station' : 'Pier Location'}</label><select id="f3" class="inp pier-select">${PIERS.map(x => `<option>${x}</option>`).join('')}</select>` : ''}
  
@@ -1769,21 +1769,43 @@
       if (q.error) { await sb.auth.signOut(); return toast('Could not create the profile. Try again.', 1) }
       tutPend(r.data.user.id); S.newId = id; AM = 'in'; await enter(LR)
     }
+    function clearStaleAuthTokens() {
+      try {
+        Object.keys(localStorage).filter(k => /^sb-.*-auth-token/.test(k)).forEach(k => localStorage.removeItem(k));
+      } catch (e) { }
+    }
     //-> Function: enter(want)
     //-> Restores the Supabase session and profile, sets the user's role and identity, and loads their workspace data.
     async function enter(want) {
-      const { data: { user } } = await sb.auth.getUser(); if (!user) return false;
+      let user = null;
+      try {
+        const { data, error } = await sb.auth.getUser();
+        if (error) {
+          if (/refresh token|invalid jwt|session/i.test(error.message || '')) {
+            clearStaleAuthTokens();
+            try { await sb.auth.signOut({ scope: 'local' }); } catch (e) { }
+          }
+          return false;
+        }
+        user = data && data.user;
+      } catch (err) {
+        clearStaleAuthTokens();
+        try { await sb.auth.signOut({ scope: 'local' }); } catch (e) { }
+        return false;
+      }
+      if (!user) return false;
       const { data: p } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (!p || !p.approved || (want && p.role !== want)) { await sb.auth.signOut(); toast(!p ? 'No profile found for this account.' : !p.approved ? 'Account is awaiting admin approval.' : 'This account is not registered for this portal.', 1); return false }
       if (want && S.rem !== false) accSave(p.role, p.ident); if (want) S.dark = false; S.user = p.ident; S.name = p.full_name || p.name || p.ident; S.avatar = p.avatar_url || p.avatar || null; S.uid = user.id; S.role = p.role; S.tutDue = tutDueFor(user.id); S.station = p.station || 'Pier 1-3'; S.tab = TABS[p.role][0][0];
       try { await devSync(!!want); await prefsPull(); S.tutDue = tutDueFor(user.id) } catch (e) { }
       await load(1); ch = sb.channel('deal').on('postgres_changes', { event: '*', schema: 'public' }, () => load(1)).subscribe(liveStatus); startAuctionLoops(); bump(); render(); return true
     }
-    async function logout() { S.lang = 'EN'; S.dark = false; closeScanner(); S.pm = null; S.pay = null; S.pass = null; S.bp = null; S.br = null; try { await sb.auth.signOut(); if (ch) sb.removeChannel(ch) } catch (e) { } stopAuctionLoops(); SQ = ''; SF = 'all'; S.name = null; S.user = null; S.uid = null; S.live = 'off'; S.bids = []; S.catches = []; S.passes = []; S.checks = []; render() }
+    async function logout() { S.lang = 'EN'; S.dark = false; closeScanner(); S.pm = null; S.pay = null; S.pass = null; S.bp = null; S.br = null; try { await sb.auth.signOut({ scope: 'local' }); if (ch) sb.removeChannel(ch) } catch (e) { } clearStaleAuthTokens(); stopAuctionLoops(); SQ = ''; SF = 'all'; S.name = null; S.user = null; S.uid = null; S.live = 'off'; S.bids = []; S.catches = []; S.passes = []; S.checks = []; render() }
     addEventListener('storage', async e => {
       if (e.key && /^sb-.*-auth-token/.test(e.key) && S.uid) {
         try {
-          const { data: { user } } = await sb.auth.getUser();
+          const { data, error } = await sb.auth.getUser();
+          const user = !error && data && data.user;
           if (!user) { await logout(); toast('Signed out in another tab.', 1); }
           else if (user.id !== S.uid) { await enter(); toast('Active account switched in another tab.', 1); }
         } catch (err) { }
@@ -1805,6 +1827,10 @@
       S.passes = (p.data || []).map(x => ({ ...x, name: esc(x.name), t: new Date(x.created_at).toLocaleString() }));
       try { localStorage.setItem('deal-hist-' + S.uid, JSON.stringify(S.passes.map(({ pass_token, ...r }) => r))) } catch (e) { }
       S.checks = (k.data || []).map(x => ({ id: x.cid, name: esc(x.name), res: x.res, by: esc(x.by_name), t: new Date(x.created_at).toLocaleString(), iso: x.created_at, rid: Number(x.id) }));
+      if (!p.error && S.catches.length === 0 && S.passes.length === 0) {
+        if (ordRead().length) ordWrite([]);
+        try { Object.keys(localStorage).filter(k => /^(deal-cache|deal-hist-|deal-pay-|deal-bp-|deal-logged-|deal-soldseen-)/.test(k)).forEach(k => localStorage.removeItem(k)) } catch (e) { }
+      }
       if (S.role === 'checker') { const m = lsMap(LOGK()); let ch = 0; S.checks.forEach(k => { if (k.by === S.user && (!m[k.id] || m[k.id].res !== k.res || !m[k.id].t)) { m[k.id] = { t: k.iso, res: k.res, name: k.name }; ch = 1 } }); if (ch) lsSet(LOGK(), m) }
       if (S.loaded) for (const x of S.catches) {
         const o = old[x.id]; if (!o) continue;
@@ -1990,7 +2016,7 @@ ${S.user ? `<div class="flex items-center gap-2 shrink-0" role="toolbar" aria-la
 <div class="text-xs flex justify-between"><b>Hati-Hati Bañera</b><span>${so ? c.kg : c.claimed}/${c.kg} kg</span></div><div class="h-2 bg-slate-200 rounded mt-1"><div class="h-2 bg-[#006878] rounded" style="width:${p}%"></div></div>
 <div class="text-xs flex justify-between text-slate-500 mt-1"><span>${so ? 'Every tub claimed' : c.claimed + ' kg claimed'}</span><span>${o} kg open</span></div>${pt ? `<div class="text-xs font-semibold text-[#0B4A5D] mt-1">${pt}</div>` : ''}
 <div class="mt-2 min-h-[1.5rem]">${c.verified ? `<button class="text-xs text-[#006878] font-semibold" data-k="insp-${c.id}" onclick="run(this,'Loading photos…',()=>viewInsp('${c.id}'))">View inspection photos</button>` : ''}</div>
-${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? `<b data-end="${biddingEndsAt(c)}" data-lot="${c.id}">${mmss(Date.parse(biddingEndsAt(c)) - Date.now())} remaining</b>` : ''}</div>` : ''}${vend ? `<div class="mt-auto pt-3"><button class="btn w-full" ${so || o <= 0 || !c.verified || ab ? 'disabled' : ''} onclick="claim('${c.id}')">${so ? (c.closed ? 'Closed' : 'Sold out') : !c.verified ? 'Awaiting Suri-Isda check' : ab ? 'Auction in progress' : o <= 0 ? 'Fully claimed' : '+ Claim Portion (Hati-Hati)'}</button></div>` : ''}</div></article>`
+${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? `<b data-end="${biddingEndsAt(c)}" data-lot="${c.id}">${mmss(Date.parse(biddingEndsAt(c)) - Date.now())} remaining</b>` : ''}</div>` : ''}${vend ? `<div class="mt-auto pt-3"><button class="btn !w-full" ${so || o <= 0 || !c.verified || ab ? 'disabled' : ''} onclick="claim('${c.id}')">${so ? (c.closed ? 'Closed' : 'Sold out') : !c.verified ? 'Awaiting Suri-Isda check' : ab ? 'Auction in progress' : o <= 0 ? 'Fully claimed' : '+ Claim Portion (Hati-Hati)'}</button></div>` : ''}</div></article>`
     }
     // Bid-to-Vendor Catalog Filtering: raw pier logs & rejected bids are hidden from Micro Vendors until won by a Broker.
     const vendorReady = c => !!c && !!c.settled_at && !!c.winner_id && !(typeof isBidRejected === 'function' && isBidRejected(c.id));
@@ -2000,8 +2026,8 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     }
     function fSearch(v) { SQ = v; const g = $('#fgrid'); if (!g) return; g.innerHTML = floorGrid(); iconify(g); trDom(g) }
     function floor(hati) {
-      hati = hati || HATI; const live = S.catches.filter(c => !offFloor(c) && vendorReady(c)), cats = ['All']; if (!cats.includes(CAT)) CAT = 'All';
-      return `<section class="ni-reef relative overflow-hidden rounded-2xl mb-4 bg-cover bg-center" style="background-size:cover;background-position:center"><span class="absolute inset-0 bg-black/55" aria-hidden="true"></span><div class="relative z-10 p-5 sm:p-8 text-white"><h1 class="bebas text-5xl sm:text-6xl text-white">Fresh Catches</h1><p class="sub-inter mt-1 text-base sm:text-xl text-white max-w-xl">${TAG[S.lang]}</p></div></section><div class="mb-4 flex flex-col gap-2 md:flex-row md:items-center"><div class="relative w-full md:w-64 lg:w-80 md:shrink-0"><label for="fq" class="sr-only">Search catches</label><span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400" aria-hidden="true"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="5.5"/><path d="m13.5 13.5 3.5 3.5"/></svg></span><input id="fq" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" maxlength="60" value="${esc(SQ)}" placeholder="${tr('Search catches')}" oninput="fSearch(this.value)" class="inp !h-11 !pl-9"></div><div class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1" role="group" aria-label="Catch filters">${cats.map(x => `<button class="pill border h-11 shrink-0 ${CAT === x ? 'on' : ''}" onclick="CAT='${x}';render()">${x}${x === 'All' ? ' · ' + live.length : ''}</button>`).join('')}<span class="mx-1 h-6 w-px shrink-0 bg-slate-300" aria-hidden="true"></span><button type="button" class="pill border h-11 shrink-0" onclick="SF='ongoing';S.tab='sold';render()">On-going</button><button type="button" class="pill border h-11 shrink-0" onclick="SF='sold';S.tab='sold';render()">Sold Out</button><button type="button" class="pill border h-11 shrink-0" onclick="SF='closed';S.tab='sold';render()">Closed</button></div></div>
+      hati = hati || HATI;
+      return `<section class="ni-reef relative overflow-hidden rounded-2xl mb-4 bg-cover bg-center" style="background-size:cover;background-position:center"><span class="absolute inset-0 bg-black/55" aria-hidden="true"></span><div class="relative z-10 p-5 sm:p-8 text-white"><h1 class="bebas text-5xl sm:text-6xl text-white">Fresh Catches</h1><p class="sub-inter mt-1 text-base sm:text-xl text-white max-w-xl">${TAG[S.lang]}</p></div></section><div class="mb-4 flex flex-col gap-2 md:flex-row md:items-center"><div class="relative w-full md:w-64 lg:w-80 md:shrink-0"><label for="fq" class="sr-only">Search catches</label><span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400" aria-hidden="true"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="5.5"/><path d="m13.5 13.5 3.5 3.5"/></svg></span><input id="fq" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" maxlength="60" value="${esc(SQ)}" placeholder="${tr('Search catches')}" oninput="fSearch(this.value)" class="inp !h-11 !pl-9"></div><div class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1" role="group" aria-label="Catch filters"><button type="button" class="pill border h-11 shrink-0" onclick="SF='ongoing';S.tab='sold';render()">On-going Transaction</button><button type="button" class="pill border h-11 shrink-0" onclick="SF='sold';S.tab='sold';render()">Sold Out</button></div></div>
  <div id="fgrid" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${floorGrid(hati)}</div>`
     }
     // ---> hati-hati portion selection and claiming <---
@@ -2028,7 +2054,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
   <div class="flex justify-between gap-3"><span>Base portion cost<span id="pmb" class="block text-xs text-slate-500 font-mono">${kg} kg × ${fmt(c.price)}</span></span><b id="pmbase" class="font-mono">${fmt(t.base)}</b></div>
   <div class="flex justify-between gap-3"><span>Broker commission (5%), port fee & handling</span><b id="pmfee" class="font-mono">${fmt(t.port + t.comm + t.ice)}</b></div>
   <div class="flex justify-between gap-3 border-t pt-2"><span class="font-semibold">Total payable (escrow locked)</span><b id="pmtot" class="text-emerald-600 font-bold font-mono text-lg">${fmt(t.total)}</b></div></div>
- <button id="pmgo" data-k="claim" class="btn mt-4" onclick="run(this,'Opening payment…',pmConfirm)"><svg class="inline w-4 h-4 mr-1 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg> CONTINUE TO PAYMENT</button></div></div>`};
+ <button id="pmgo" data-k="claim" class="btn !w-full mt-4" onclick="run(this,'Opening payment…',pmConfirm)"><svg class="inline w-4 h-4 mr-1 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg> CONTINUE TO PAYMENT</button></div></div>`};
     //-> Function: pmSet(kilograms)
     //-> Clamps the requested quantity, updates S.pm.kg, and refreshes the amount inputs, slider, and escrow cost breakdown.
     const pmMsg = (k, o) => `Only ${o} kg left in this tub. You entered ${k} kg. Please enter ${o} kg or less.`;
@@ -2083,7 +2109,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
   <div class="flex justify-between gap-3"><span>Base portion cost</span><b class="font-mono">${fmt(t.base)}</b></div>
   <div class="flex justify-between gap-3"><span>Broker commission (5%), port fee & handling</span><b class="font-mono">${fmt(t.port + t.comm + t.ice)}</b></div>
   <div class="flex justify-between gap-3 border-t pt-2"><span class="font-semibold">Total payable</span><b class="text-emerald-600 font-bold font-mono text-lg">${fmt(t.total)}</b></div></div>
- <button data-k="pay" data-af class="btn mt-4" onclick="run(this,'Processing payment…',payGo)">Pay amount · ${fmt(t.total)}</button>
+ <button data-k="pay" data-af class="btn !w-full mt-4" onclick="run(this,'Processing payment…',payGo)">Pay amount · ${fmt(t.total)}</button>
  <button class="btn2 mt-2 w-full" onclick="S.pm={id:S.pay.id,kg:S.pay.kg};S.pay=null;render()">Back</button></div></div>`};
     //-> Function: payGo()
     //-> Simulates the cashless step (demo), then claims the portion. Offline, the claim and its payment are saved on this device and sent when you sync.
@@ -2112,7 +2138,8 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       const items = item ? [['Base (' + fmt(c.price) + ' × ' + kg + ' kg)', fmt(t.base)], ['Port fee (₱2.50/kg)', fmt(t.port)], ['Broker commission (5%)', fmt(t.comm)], ['Ice / tub handling', fmt(t.ice)]] : [];
       const pr = [['Payment method', payLbl(pay && pay.method)], ['Payment ref.', pay && pay.method !== 'cash' ? String(pay.ref) : '—'], ['Status', p.status === 'escrow' ? 'Escrow held' : 'Released']];
       const notes = [pay && pay.method === 'cash' ? 'Pay the exact amount in cash at dockside pickup.' : 'Escrow is released once the broker verifies pickup.'].concat(pay && pay.method === 'cashless' ? ['Cashless payment is for demo only. No real money was charged.'] : []);
-      const S2 = 2, W = 640, H = 150 + (rows.length + items.length + pr.length) * 30 + 90 + notes.length * 22 + 40, cv = document.createElement('canvas'); cv.width = W * S2; cv.height = H * S2;
+      const qrText = p.pass_token ? qrPayload(p) : '';
+      const S2 = 2, W = 640, H = 150 + (rows.length + items.length + pr.length) * 30 + 90 + notes.length * 22 + 40 + (qrText ? 200 : 0), cv = document.createElement('canvas'); cv.width = W * S2; cv.height = H * S2;
       const x = cv.getContext('2d'); x.scale(S2, S2); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
       const SANS = '"Segoe UI",Roboto,Arial,sans-serif', MONO = '"Courier New",monospace'; let y = 48;
       x.fillStyle = '#0B0E17'; x.font = 'bold 26px ' + SANS; x.textAlign = 'center'; x.fillText('DEAL Navotas', W / 2, y); y += 26; x.font = '15px ' + SANS; x.fillStyle = '#475569'; x.fillText(pay && pay.method === 'cash' ? 'Claim slip (cash, unpaid)' : 'Payment receipt', W / 2, y); y += 18;
@@ -2123,13 +2150,14 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       x.textAlign = 'left'; x.fillStyle = '#0B0E17'; x.font = 'bold 18px ' + SANS; x.fillText(pay && pay.method === 'cash' ? 'Total due at pickup' : 'Total paid', 32, y + 4); x.textAlign = 'right'; x.fillStyle = '#059669'; x.font = 'bold 22px ' + MONO; x.fillText('₱' + fmt(total).replace(/^₱/, ''), W - 32, y + 4); y += 34;
       line(); pr.forEach(r => row(r[0], r[1])); y += 2;
       x.textAlign = 'center'; x.fillStyle = '#64748b'; x.font = '12px ' + SANS; notes.forEach(n => { x.fillText(n, W / 2, y); y += 22 });
+      if (qrText && drawQrOnCanvas(x, qrText, W / 2, y + 8, 156)) { y += 178; x.fillStyle = '#0B4A5D'; x.font = 'bold 12px ' + MONO; x.fillText('ESCROW QR PASS · ' + p.id, W / 2, y); }
       cv.toBlob(bl => { if (!bl) return toast('Could not create the receipt.', 1); const u = URL.createObjectURL(bl), a = document.createElement('a'); a.href = u; a.download = 'receipt-' + p.id + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); toast('Receipt downloaded.') }, 'image/png')
     }
     //-> Function: doClaim(catchId, kilograms)
     //-> Calls the Supabase claim_portion RPC, stores the returned escrow pass in state, reloads records, and redraws.
     async function doClaim(id, kg, pay, shipOpts) {
-      const lot = find(id), purchasedQty = lot ? Math.max(1, Math.ceil(kg / (+lot.kg || 25))) : 1, wasLast = !!lot && remainingTubs(lot) <= purchasedQty && kg >= open(lot) - 1e-9; const { data, error } = await sb.rpc('claim_portion', { p_cid: id, p_kg: kg }); if (error) { toast(error.message, 1); return false }
-      if (lot) lot.remaining_tubs = Math.max(0, remainingTubs(lot) - purchasedQty);
+      const lot = find(id), newClaimed = lot ? (+lot.claimed || 0) + kg : kg, completedTubs = lot ? Math.floor((newClaimed + 1e-9) / (+lot.kg || 25)) : 1, wasLast = !!lot && remainingTubs(lot) <= completedTubs && kg >= open(lot) - 1e-9; const { data, error } = await sb.rpc('claim_portion', { p_cid: id, p_kg: kg }); if (error) { toast(error.message, 1); return false }
+      if (lot) lot.remaining_tubs = Math.max(0, remainingTubs(lot) - completedTubs);
       if (pay && data && data.id) await paySave(data.id, pay);
       if (lot && typeof createVendorOrder === 'function') createVendorOrder(lot, kg, data, pay, shipOpts || { fulfillment: 'broker_delivery', marketId: 'nepo', stallNote: '' });
       S.pm = null; S.pay = null; S.pass = data && data.pass_token ? { ...data, pay, t: new Date(data.created_at).toLocaleString() } : null; await load(1); const nl = find(id); toast((pay && pay.method === 'cashless' ? 'Payment received. Escrow pass generated.' : pay ? 'Portion claimed. Pay cash at pickup. Pass generated.' : 'Portion claimed.') + (wasLast && nl && soldOut(nl) ? ' This lot is now Sold out.' : '')); render(); return true
@@ -2166,7 +2194,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
    <div class="flex justify-between gap-3"><span>Commission (5%)</span><b class="font-mono">${fmt(t.comm)}</b></div>
    <div class="flex justify-between gap-3"><span>Ice / handling</span><b class="font-mono">${fmt(t.ice)}</b></div>
    <div class="flex justify-between gap-3 border-t pt-2"><span class="font-semibold">Total payable</span><b class="text-emerald-600 font-bold font-mono text-lg">${fmt(t.total)}</b></div></div>
-  <button data-k="bidpay" data-af class="btn mt-4" onclick="run(this,'Processing payment…',bpGo)">Pay amount · ${fmt(t.total)}</button>
+  <button data-k="bidpay" data-af class="btn !w-full mt-4" onclick="run(this,'Processing payment…',bpGo)">Pay amount · ${fmt(t.total)}</button>
   <button class="btn2 mt-2 w-full" onclick="S.bp=null;render()">Pay later</button></div></div>`};
     //-> Function: bpGo()
     //-> Simulates the cashless step (demo only), records the payment against the lot, then opens the receipt dialog.
@@ -2234,6 +2262,16 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       const q = qrcode(0, 'M'); q.addData(t); q.make(); const n = q.getModuleCount(), m = 4; let d = ''; for (let r = 0; r < n; r++)for (let c = 0; c < n; c++)if (q.isDark(r, c)) d += `M${c + m} ${r + m}h1v1h-1z`;
       return `<svg viewBox="0 0 ${n + 2 * m} ${n + 2 * m}" class="w-full h-auto block" shape-rendering="crispEdges" role="img" aria-label="Escrow pass QR code"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg>`
     }
+    function drawQrOnCanvas(x, t, cx, topY, size = 160) {
+      if (!window.qrcode || !t) return 0;
+      const q = qrcode(0, 'M'); q.addData(t); q.make();
+      const n = q.getModuleCount(), m = 2, cell = size / (n + m * 2), ox = cx - size / 2;
+      x.fillStyle = '#fff'; x.fillRect(ox, topY, size, size);
+      x.strokeStyle = '#e2e8f0'; x.lineWidth = 1; x.strokeRect(ox, topY, size, size);
+      x.fillStyle = '#000';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) x.fillRect(ox + (c + m) * cell, topY + (r + m) * cell, Math.ceil(cell), Math.ceil(cell));
+      return size;
+    }
     const kv = (a, b) => `<div class="flex justify-between gap-3 py-1 border-b text-sm"><span class="text-slate-500">${a}</span><b class="font-mono text-right break-all">${b}</b></div>`;
     const passModal = () => {
       const p = S.pass; if (!p || !p.pass_token) return '';
@@ -2241,7 +2279,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
  <h2 class="font-mono font-bold text-lg mt-2">Escrow pass generated</h2>
  <div class="rounded-xl p-2 mx-auto my-3 max-w-[260px]" style="background:#fff">${qrSvg(qrPayload(p))}</div>
  <div class="text-left">${kv('Pass ID', esc(p.id))}${kv('Catch', esc(p.name))}${kv('Portion weight', p.kg + ' kg')}${kv('Escrow amount', fmt(p.total))}${kv('Payment', payLbl((p.pay || payOf(p) || {}).method))}</div>
- <p class="text-xs text-slate-500 mt-3">Show this QR code to the broker at dockside pickup.</p><button class="btn2 mt-3 w-full" onclick="dlReceipt('${esc(p.id)}')">Download receipt</button><button class="btn mt-2" onclick="S.pass=null;render()">Done</button></div></div>`
+ <p class="text-xs text-slate-500 mt-3">Show this QR code to the broker at dockside pickup.</p><button class="btn2 mt-3 w-full" onclick="dlReceipt('${esc(p.id)}')">Download receipt</button><button class="btn !w-full mt-2" onclick="S.pass=null;render()">Done</button></div></div>`
     };
     //-> Function: showQr(passId)
     //-> Loads the selected vendor pass into S.pass and re-renders the QR pass dialog.
@@ -2255,7 +2293,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       for (const x of q) { const { data: sd, error } = await sb.rpc('claim_portion', { p_cid: x.id, p_kg: x.kg }); if (!error) { ok++; if (x.pay && sd && sd.id) paySave(sd.id, x.pay); const lot = find(x.id); if (lot && typeof createVendorOrder === 'function') createVendorOrder(lot, x.kg, sd, x.pay, x.shipOpts) } else { toast(`${x.sid}: ${error.message}`, 1); if (/failed to fetch|network|load failed/i.test(error.message)) keep.push(x) } }
       S.queue = keep; if (ok) note('Offline sync complete', ok + ' transaction(s) reconciled.', 1); toast(`${ok} of ${q.length} transaction(s) synced.`); await load(1); if (keep.length) toast('Network problem. Your saved claims are kept. Try again.', 1)
     }
-    function syncV() { return h1('Offline Sync Engine', 'Transactions made without signal are stored here until you sync.') + (S.queue.length ? S.queue.map((q, qi) => `<div class="card p-4 mb-3" tabindex="0" data-qi="${qi}" aria-label="Saved transaction. Press Delete to remove."><span class="badge b-pend">⏱️ Pending Local Sync</span> <button class="btn2 !py-1 !px-2 text-xs float-right" onclick="delQ(${qi})">🗑️ Remove</button><div class="font-mono text-sm mt-1">${q.sid} · ${q.kg} kg ${(find(q.id) || {}).name} · ${q.t}</div></div>`).join('') + `<button class="btn" data-k="sync" onclick="run(this,'Syncing…',syncNow)">Sync pending transactions</button>` : `<p class="text-slate-500">Nothing pending. Tap the status badge in the header to simulate offline.</p>`) }
+    function syncV() { return h1('Offline Sync Engine', 'Transactions made without signal are stored here until you sync.') + (S.queue.length ? S.queue.map((q, qi) => `<div class="card p-4 mb-3" tabindex="0" data-qi="${qi}" aria-label="Saved transaction. Press Delete to remove."><span class="badge b-pend">⏱️ Pending Local Sync</span> <button class="btn2 !py-1 !px-2 text-xs float-right" onclick="delQ(${qi})">🗑️ Remove</button><div class="font-mono text-sm mt-1">${q.sid} · ${q.kg} kg ${(find(q.id) || {}).name} · ${q.t}</div></div>`).join('') + `<button class="btn !w-full" data-k="sync" onclick="run(this,'Syncing…',syncNow)">Sync pending transactions</button>` : `<p class="text-slate-500">Nothing pending. Tap the status badge in the header to simulate offline.</p>`) }
     const payRow = p => { const y = payOf(p) || {}, m = y.method; return `<div class="mt-1 text-sm flex flex-wrap items-center gap-x-2"><span class="text-xs font-mono text-slate-500 uppercase">Payment method</span><b>${m === 'cashless' ? '📱' : m === 'cash' ? '💵' : '❔'} ${payLbl(m)}</b>${y.ref ? `<span class="text-xs font-mono text-slate-500">· ${esc(y.ref)}</span>` : ''}</div>` };
     function passes() {
       const tot = S.passes.reduce((a, p) => a + p.total, 0), held = S.passes.filter(p => p.status === 'escrow'), br = S.role === 'broker', vd = S.role === 'vendor';
@@ -2267,7 +2305,12 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     }
     //-> Function: release(passId)
     //-> Requests a broker escrow release through Supabase and refreshes the ledger after success.
-    async function release(id) { const { error } = await sb.rpc('release_escrow', { p_id: id }); if (error) return toast(error.message, 1); toast('Escrow released.'); await load(1) }
+    async function release(id) {
+      const { error } = await sb.rpc('release_escrow', { p_id: id }); if (error) return toast(error.message, 1);
+      const list = ordRead(), ord = list.find(o => o.passId === id);
+      if (ord && ord.status !== 'Delivered') { ord.status = 'Delivered'; ord.escrowStatus = 'Released'; ord.updatedAt = new Date().toISOString(); ordWrite(list); }
+      toast('Escrow released.'); await load(1)
+    }
     async function relAsk(btn, id) { if (!await ask('Release escrow?', 'This pays out the vendor’s escrow for this pass. Normally you scan the QR pass at pickup instead. This cannot be undone.', 'Release escrow', 1)) return; return run(btn, 'Releasing escrow…', () => release(id)) }
 
     // ---> broker dockside QR scanner and escrow release <---
@@ -2301,7 +2344,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       const r = $('#scRes'); if (!r) return;
       r.innerHTML = `<div class="rounded-xl border-2 p-4 ${ok ? 'border-emerald-500 bg-emerald-100 text-emerald-800' : 'border-red-500 bg-red-100 text-red-800'}"><div class="font-bold">${ok ? '✓ ' : '✕ '}${esc(msg)}</div>
  ${p ? `<div class="mt-2 text-slate-900">${kv('Status', 'Released / Verified pickup')}${kv('Catch', esc(p.catch_name) + ' · ' + esc(p.catch_id))}${kv('Vendor', esc(p.vendor_ident || '—'))}${kv('Verified weight', p.kg + ' kg')}${kv('Escrow released', fmt(p.total))}${kv('Payment', payLbl((payOf(S.passes.find(x => x.id === p.id) || {}) || {}).method))}</div>` : ''}</div>
- <button class="btn mt-3" onclick="scNext()">Scan next pass</button>`; trDom(r); beep(ok); buzz(ok ? [100, 50, 100] : [300])
+ <button class="btn !w-full mt-3" onclick="scNext()">Scan next pass</button>`; trDom(r); beep(ok); buzz(ok ? [100, 50, 100] : [300])
     }
     function scNext() { const r = $('#scRes'); if (r) r.innerHTML = ''; scBusy = false; try { SC && SC.resume() } catch (e) { } }
     async function scFile(inp) { const f = inp.files[0]; inp.value = ''; if (!f || !SC) return; try { const t = await SC.scanFile(f, false); scBusy = false; onScan(t) } catch (e) { scShow(0, 'No QR code found in that photo.') } }
@@ -2317,6 +2360,8 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       if (error) return scShow(0, error.message);
       if (!data || !data.success) return scShow(0, (data && data.message) || 'Pass not verified.');
       const pp = S.passes.find(x => x.id === m[1]); if (pp) { pp.status = 'released'; pp.scanned_at = data.pass.released_at || new Date().toISOString() }
+      const list = ordRead(), ord = list.find(o => o.passId === m[1]);
+      if (ord && ord.status !== 'Delivered') { ord.status = 'Delivered'; ord.escrowStatus = 'Released'; ord.qrVerifiedAt = new Date().toISOString(); ord.qrVerifiedBy = S.user || roleLabel(S.role); ord.updatedAt = ord.qrVerifiedAt; ordWrite(list); }
       scShow(1, data.message, data.pass); render(); load(1)
     }
 
@@ -2345,7 +2390,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
 <ul class="text-xs text-slate-600 mt-2 grid gap-1 sm:grid-cols-2">${['Bottom core sample', 'Gill & eye freshness', 'Weight and species match', 'Multi-angle proof reviewed'].map(x => `<li>🔍 ${x}</li>`).join('')}</ul>
 <div class="grid grid-cols-3 gap-2 mt-3 text-xs text-center">${['Front', 'Middle', 'Bottom'].map((x, i) => `<label class="relative border-2 border-dashed rounded-lg h-28 flex items-center justify-center cursor-pointer overflow-hidden"><span>${x} +</span><img id="evp${i}" class="hidden absolute inset-0 w-full h-full object-cover" alt=""><span id="evc${i}" class="hidden absolute bottom-1 inset-x-1 bg-emerald-600 text-white text-[0.6875rem] font-bold rounded px-1 py-0.5">✓ Photo Captured</span><input id="ev${i}" type="file" accept="image/*" class="hidden" onchange="prev(this,'evp${i}');fishPick(this,${i})"></label>`).join('')}</div>
 <p class="text-xs text-slate-500 mt-2">Front = top layer of the tub. Only photos of fish are accepted; anything else is rejected. The front photo is also shown on the lot card.</p></div>
-<button class="btn mt-4" data-k="log">+ Log Incoming Catch</button></form>`}
+<button class="btn !w-full mt-4" data-k="log">+ Log Incoming Catch</button></form>`}
     const shrink = (f, m = 800, q = .75) => new Promise(r => { if (!f) return r(null); const i = new Image, u = URL.createObjectURL(f); i.onload = () => { const k = Math.min(1, m / Math.max(i.width, i.height)), c = document.createElement('canvas'); c.width = Math.round(i.width * k); c.height = Math.round(i.height * k); c.getContext('2d').drawImage(i, 0, 0, c.width, c.height); URL.revokeObjectURL(u); r(c.toDataURL('image/jpeg', q)) }; i.onerror = () => r('ERR'); i.src = u });
     function prev(inp, id) { const f = inp.files[0], im = $('#' + id); if (!f) { im.classList.add('hidden'); return } im.onerror = () => { toast('This photo could not be previewed. Use a JPG or PNG image.', 1); im.classList.add('hidden') }; im.src = URL.createObjectURL(f); im.classList.remove('hidden') }
     async function viewEv(id) { const { data, error } = await sb.from('checks').select('*').eq('id', id).maybeSingle(); if (error || !data) return toast('Could not load the evidence.', 1); S.ev = data; render() }
@@ -2355,7 +2400,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     const evModal = () => {
       const d = S.ev; if (!d) return ''; const ok = u => /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(u || '');
       const ph = [d.photo_top, d.photo_mid, d.photo_bot].map((u, i) => ok(u) ? `<div><img src="${u}" class="rounded-lg w-full h-28 object-cover" alt=""><div class="text-xs text-center mt-1">${['Top', 'Middle', 'Bottom'][i]}</div></div>` : '').join('');
-      return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-lg p-5" role="dialog" aria-modal="true"><div class="font-mono text-xs text-slate-500">${esc(d.cid)} · ${esc(d.res)}${d.fresh ? ` · ${esc(d.fresh)}/10` : ''}${d.by_name ? ` · ${esc(d.by_name)}` : ''}</div><h2 class="font-semibold text-lg">${esc(d.name)}</h2>${ph ? `<div class="grid grid-cols-3 gap-2 my-3">${ph}</div>` : '<p class="text-sm text-slate-500 my-3">No photos saved.</p>'}${aiBlock(d.ai_report)}<button class="btn mt-4" onclick="S.ev=null;render()">Close</button></div></div>`
+      return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-lg p-5" role="dialog" aria-modal="true"><div class="font-mono text-xs text-slate-500">${esc(d.cid)} · ${esc(d.res)}${d.fresh ? ` · ${esc(d.fresh)}/10` : ''}${d.by_name ? ` · ${esc(d.by_name)}` : ''}</div><h2 class="font-semibold text-lg">${esc(d.name)}</h2>${ph ? `<div class="grid grid-cols-3 gap-2 my-3">${ph}</div>` : '<p class="text-sm text-slate-500 my-3">No photos saved.</p>'}${aiBlock(d.ai_report)}<button class="btn !w-full mt-4" onclick="S.ev=null;render()">Close</button></div></div>`
     };
     //-> Function: logGo(event)
     //-> Prevents the browser form submit and runs logCatch() through the shared busy/error handling.
@@ -2437,7 +2482,8 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       let ai; try { ai = await aiInspect(files, ev) } catch (e) { return toast(e.message, 1) }
       const sc = Math.min(10, Math.max(1, +ai.freshness_score || 1)), pass = !!ai.passed;
       const photo = await shrink(files[0], 800, .75);
-      const { data: { user: curAuth } } = await sb.auth.getUser();
+      let curAuth = null;
+      try { const { data, error } = await sb.auth.getUser(); if (!error && data) curAuth = data.user; } catch (e) { }
       if (!curAuth || curAuth.id !== S.uid) {
         await enter();
         return toast('Your session changed in another browser tab. Please sign in as Pier Checker in this window and try again.', 1);
@@ -2471,13 +2517,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     const biddingEndsAt = c => {
       if (!c) return '';
       if (c.bidding_ends_at) return c.bidding_ends_at;
-      if (c.auction_ends) {
-        const endMs = Date.parse(c.auction_ends), startMs = c.created_at ? Date.parse(c.created_at) : NaN;
-        if (!isNaN(endMs) && !isNaN(startMs) && endMs - startMs > AUCTION_DURATION_MS + 5000) {
-          return new Date(Math.min(endMs, startMs + AUCTION_DURATION_MS)).toISOString();
-        }
-        return c.auction_ends;
-      }
+      if (c.auction_ends) return c.auction_ends;
       return '';
     };
     const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0') };
@@ -2785,7 +2825,9 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
       return (h >>> 0).toString(16).padStart(8, '0') + 'deal9f2a';
     };
-    const orderQrPayload = o => `ORDQR1|${o.id}|${o.cid}|${orderQrToken(o)}`;
+    const orderQrPayload = o => (o && o.kind === 'vendor_sale' && o.passId && o.passToken)
+      ? `DEAL1|${o.passId}|${o.passToken}`
+      : `ORDQR1|${o.id}|${o.cid}|${orderQrToken(o)}`;
     addEventListener('storage', e => { if (e.key === ORD_K && S.user) render() });
     function calcMarketRoute(marketId, vehicleType = 'L300 Van', kg = 10) {
       const m = MARKETS[marketId] || MARKETS.nepo, f = FLEET_TYPES[vehicleType] || FLEET_TYPES['L300 Van'];
@@ -2794,10 +2836,12 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       return { market: m.name, city: m.city, km: m.km, etaMinutes, etaText: `${etaMinutes} mins`, transportFee, coldChain: f.cold };
     }
     const isBidRejected = cid => ordRead().some(o => o.kind === 'pier_acquisition' && o.cid === cid && o.status === 'Rejected');
+    const ordClearedAt = () => { try { return +(localStorage.getItem('deal-ord-cleared') || 0) } catch (e) { return 0 } };
     function syncPierAcquisitions(catches, notifyNew) {
-      const list = ordRead(); let changed = false;
+      const list = ordRead(), cut = ordClearedAt(); let changed = false;
       for (const c of (catches || [])) {
         if (!c.settled_at || !c.winner_id) continue;
+        if (cut && Date.parse(c.settled_at) <= cut) continue;
         const id = 'ACQ-' + c.id;
         if (list.some(o => o.id === id)) continue;
         const now = new Date().toISOString();
@@ -2818,16 +2862,22 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     }
     function syncVendorOrdersFromPasses(passes) {
       if (S.role !== 'vendor' || !Array.isArray(passes) || !passes.length) return;
-      const list = ordRead(); let changed = false;
+      const list = ordRead(), cut = ordClearedAt(); let changed = false;
       for (const p of passes) {
         if (!p || !p.id) continue;
-        if (list.some(o => o.passId === p.id)) continue;
+        if (cut && p.created_at && Date.parse(p.created_at) <= cut) continue;
+        const existing = list.find(o => o.passId === p.id);
+        if (existing) {
+          if (!existing.passToken && p.pass_token) { existing.passToken = p.pass_token; changed = true; }
+          continue;
+        }
         const lot = find(p.cid) || {};
         const now = p.created_at || new Date().toISOString();
         const rec = {
           id: 'ORD-' + String(p.id).replace(/[^A-Za-z0-9]/g, '').slice(-5).toUpperCase(),
           kind: 'vendor_sale',
           passId: p.id,
+          passToken: p.pass_token || null,
           cid: p.cid || 'LOT',
           catchName: p.name || lot.name || 'Fresh Catch',
           kg: +p.kg || 0,
@@ -2874,6 +2924,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
         id: 'ORD-' + Date.now().toString(36).slice(-5).toUpperCase(),
         kind: 'vendor_sale',
         passId: (passData && passData.id) || ('PASS-' + Date.now().toString(36).slice(-4).toUpperCase()),
+        passToken: (passData && passData.pass_token) || null,
         cid: lot.id, catchName: lot.name, kg: +kg, tubs: Math.max(1, Math.ceil(+kg / (+lot.kg || 25))),
         pricePerKg: +lot.price,
         total: passData && passData.total ? +passData.total : tar(lot.price, kg).total,
@@ -2971,7 +3022,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
 <div id="ord-qr-reader" class="mt-3 rounded-lg overflow-hidden bg-black min-h-[240px]"></div>
 <label id="ordScFile" class="hidden btn2 mt-3 text-center cursor-pointer block">Scan QR from photo<input type="file" accept="image/*" class="hidden" onchange="ordScFileScan(this)"></label>
 <div id="ordScRes" class="mt-3" aria-live="polite"></div>
-<div class="mt-3 pt-3 border-t border-slate-200"><div class="text-[0.6875rem] font-mono text-slate-500 mb-1.5">No camera on this device? Verify QR token manually:</div><div class="flex gap-2"><input id="ordQrManual" class="inp !py-1.5 text-xs font-mono flex-1" placeholder="ORDQR1|..." value="${esc(orderQrPayload(o))}"><button type="button" class="btn !w-auto px-3 !py-1.5 text-xs" onclick="verifyOrderQr('${o.id}', vl('ordQrManual'), '${phase}')">Verify QR</button></div></div></div>`;
+<div class="mt-3 pt-3 border-t border-slate-200"><div class="text-[0.6875rem] font-mono text-slate-500 mb-1.5">No camera on this device? Verify QR token manually:</div><div class="flex gap-2"><input id="ordQrManual" class="inp !py-1.5 text-xs font-mono flex-1" placeholder="DEAL1|... or ORDQR1|..." value="${esc(orderQrPayload(o))}"><button type="button" class="btn !w-auto px-3 !py-1.5 text-xs" onclick="verifyOrderQr('${o.id}', vl('ordQrManual'), '${phase}')">Verify QR</button></div></div></div>`;
       document.body.append(d); trDom(d);
       if (!window.Html5Qrcode) { $('#ordScFile').classList.remove('hidden'); return; }
       try {
@@ -2987,11 +3038,11 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       const f = inp.files[0]; inp.value = ''; if (!f || !ORD_SC || !ORD_SC_CTX) return;
       try { const t = await ORD_SC.scanFile(f, false); verifyOrderQr(ORD_SC_CTX.orderId, t, ORD_SC_CTX.phase) } catch (e) { toast('No QR code found in that photo.', 1) }
     }
-    function verifyOrderQr(orderId, rawText, phase) {
+    async function verifyOrderQr(orderId, rawText, phase) {
       const list = ordRead(), o = list.find(x => x.id === orderId);
       if (!o) { ORD_SC_BUSY = false; return toast('Order not found.', 1); }
-      const expected = orderQrPayload(o), scanned = String(rawText || '').trim();
-      if (scanned !== expected) {
+      const expected = orderQrPayload(o), legacy = `ORDQR1|${o.id}|${o.cid}|${orderQrToken(o)}`, passQr = (o.passId && o.passToken) ? `DEAL1|${o.passId}|${o.passToken}` : '', scanned = String(rawText || '').trim();
+      if (!scanned || (scanned !== expected && scanned !== legacy && (!passQr || scanned !== passQr))) {
         ORD_SC_BUSY = false; beep(0); buzz([300]);
         const r = $('#ordScRes'); if (r) r.innerHTML = `<div class="rounded-xl border-2 border-red-500 bg-red-100 text-red-800 p-3 text-xs font-bold">✕ QR mismatch! This pass does not belong to ${esc(o.id)}.</div>`;
         return;
@@ -3003,6 +3054,9 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       o.qrVerifiedBy = S.user || roleLabel(S.role);
       o.updatedAt = nowIso;
       ordWrite(list);
+      if (phase !== 'pier' && o.passId && sb) {
+        try { await sb.rpc('release_escrow', { p_id: o.passId }); await load(1); } catch (e) { }
+      }
       beep(1); buzz([100, 50, 100]);
       if (phase === 'pier') {
         noteFor(['checker', 'broker'], 'Pier QR Release Verified', `${o.cid} verified via QR scan by ${o.qrVerifiedBy}. Handed to Broker & archived to History.`);
@@ -3051,7 +3105,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
         return `<div class="mt-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-sm"><div class="font-semibold text-emerald-900">★ ${existing.stars}/5 · Rated ${esc(targetLabel)}</div>${existing.comment ? `<p class="text-xs text-slate-700 mt-1">"${existing.comment}"</p>` : ''}<div class="text-[0.6875rem] text-slate-500 mt-1">${esc(existing.at)}</div></div>`;
       }
       const cur = ORD_STAR[o.id] || 5;
-      return `<div class="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50"><div class="text-xs font-mono font-semibold text-slate-600 uppercase">Rate ${esc(targetLabel)}</div><div class="flex gap-1 my-2">${[1, 2, 3, 4, 5].map(n => `<button type="button" onclick="setOrderStar('${o.id}',${n})" class="text-xl px-1 ${n <= cur ? 'text-amber-500' : 'text-slate-300'}" aria-label="${n} stars">★</button>`).join('')}<span class="text-xs font-mono self-center ml-2">${cur}/5</span></div><textarea id="rat-txt-${o.id}" rows="2" class="inp text-sm" placeholder="Leave feedback on quality, speed, or delivery..."></textarea><button type="button" class="btn mt-2" onclick="submitOrderRating('${o.id}','${raterRole}')">Submit Rating & Feedback</button></div>`;
+      return `<div class="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50"><div class="text-xs font-mono font-semibold text-slate-600 uppercase">Rate ${esc(targetLabel)}</div><div class="flex gap-1 my-2">${[1, 2, 3, 4, 5].map(n => `<button type="button" onclick="setOrderStar('${o.id}',${n})" class="text-xl px-1 ${n <= cur ? 'text-amber-500' : 'text-slate-300'}" aria-label="${n} stars">★</button>`).join('')}<span class="text-xs font-mono self-center ml-2">${cur}/5</span></div><textarea id="rat-txt-${o.id}" rows="2" class="inp text-sm" placeholder="Leave feedback on quality, speed, or delivery..."></textarea><button type="button" class="btn !w-full mt-2" onclick="submitOrderRating('${o.id}','${raterRole}')">Submit Rating & Feedback</button></div>`;
     }
     async function cancelOrder(id) {
       const list = ordRead(), o = list.find(x => x.id === id);
@@ -3080,7 +3134,8 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     function dlOrderReceipt(orderId) {
       const o = ordRead().find(x => x.id === orderId);
       if (!o) return toast('Order record not found.', 1);
-      const S2 = 2, W = 640, H = 440, cv = document.createElement('canvas');
+      const qrText = orderQrPayload(o);
+      const S2 = 2, W = 640, H = qrText ? 650 : 440, cv = document.createElement('canvas');
       cv.width = W * S2; cv.height = H * S2;
       const x = cv.getContext('2d'); x.scale(S2, S2); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
       const SANS = '"Segoe UI",Roboto,Arial,sans-serif', MONO = '"Courier New",monospace'; let y = 46;
@@ -3098,6 +3153,10 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       line();
       x.textAlign = 'left'; x.fillStyle = '#0B0E17'; x.font = 'bold 18px ' + SANS; x.fillText('Agreed Total', 32, y + 4);
       x.textAlign = 'right'; x.fillStyle = '#059669'; x.font = 'bold 22px ' + MONO; x.fillText('₱' + fmt(o.total).replace(/^₱/, ''), W - 32, y + 4);
+      if (qrText && drawQrOnCanvas(x, qrText, W / 2, y + 28, 168)) {
+        x.textAlign = 'center'; x.fillStyle = '#0B4A5D'; x.font = 'bold 12px ' + MONO;
+        x.fillText('SCAN QR TO VERIFY · ' + (o.passId || o.id), W / 2, y + 214);
+      }
       cv.toBlob(bl => {
         if (!bl) return toast('Could not generate receipt.', 1);
         const u = URL.createObjectURL(bl), a = document.createElement('a');
@@ -3108,6 +3167,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     }
     async function clearAllOrders() {
       if (!await ask('Clear all order records?', 'This removes all local order, chat, and rating records on this browser. Run supabase_clear_records.sql in Supabase to clear database catches and passes too.', 'Clear Orders', 1)) return;
+      try { localStorage.setItem('deal-ord-cleared', String(Date.now())) } catch (e) { }
       ordWrite([]);
       toast('Local order records cleared.');
       render();
@@ -3166,7 +3226,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
               const rightCol = `<div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52">${r === 'vendor' ? `<button class="btn" onclick="openOrderQrModal('${o.id}')">🎟️ View QR Code</button>` : `<button class="btn" onclick="openOrderScanner('${o.id}','market')">📷 Scan Market Delivery QR</button>`}<button class="btn2" onclick="dlOrderReceipt('${o.id}')">📄 Download Receipt</button></div>`;
               recvLayout = `<div class="mt-3 p-3 rounded-xl border border-teal-200 bg-teal-50/50 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">${leftCol}${rightCol}</div>`;
               if (ORD_TAB === 'receive' && r === 'broker' && o.status === 'Accepted' && o.fulfillment === 'broker_delivery') {
-                actions = `<div class="mt-3 p-3 rounded-xl border border-amber-300 bg-amber-50"><div class="text-xs font-mono font-semibold text-amber-900 uppercase mb-2">Assign Broker Transport Fleet</div><div class="grid sm:grid-cols-2 gap-2"><input id="drv-${o.id}" class="inp" placeholder="Driver Name"><select id="veh-${o.id}" class="inp">${Object.keys(FLEET_TYPES).map(v => `<option>${v}</option>`).join('')}</select><input id="plt-${o.id}" class="inp" placeholder="Plate # / Vehicle ID"><input id="cnt-${o.id}" class="inp" placeholder="Driver Contact #"></div><button class="btn mt-2" onclick="dispatchVendorOrder('${o.id}')">🚚 Assign Vehicle & Mark In Transit</button></div>`;
+                actions = `<div class="mt-3 p-3 rounded-xl border border-amber-300 bg-amber-50"><div class="text-xs font-mono font-semibold text-amber-900 uppercase mb-2">Assign Broker Transport Fleet</div><div class="grid sm:grid-cols-2 gap-2"><input id="drv-${o.id}" class="inp" placeholder="Driver Name"><select id="veh-${o.id}" class="inp">${Object.keys(FLEET_TYPES).map(v => `<option>${v}</option>`).join('')}</select><input id="plt-${o.id}" class="inp" placeholder="Plate # / Vehicle ID"><input id="cnt-${o.id}" class="inp" placeholder="Driver Contact #"></div><button class="btn !w-full mt-2" onclick="dispatchVendorOrder('${o.id}')">🚚 Assign Vehicle & Mark In Transit</button></div>`;
               }
               if (ORD_TAB === 'receive') chat = renderChatBox(o, 'Broker ↔ Micro-Vendor Chat');
             }
@@ -3420,12 +3480,12 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     const fullyClaimed = c => !!c && remainingTubs(c) === 0;
     const taken = c => !!c && remainingTubs(c) === 0;
     const ongoing = c => !!c && !c.closed && !c.sold_out && c.ongoing === true && !taken(c);
-    const offFloor = c => fullyClaimed(c) || ongoing(c);
+    const offFloor = c => fullyClaimed(c);
     const ONGMSG = 'A transaction on this lot is on-going. It can be claimed again once the cash pickup QR is scanned.';
-    const soldOut = c => fullyClaimed(c) && !ongoing(c);
+    const soldOut = c => fullyClaimed(c);
     /* vendor view: once the broker has scanned this vendor's QR pass, the vendor's part of the lot is sold out (even if other tubs are still open for others) */
     const vSold = (c, ps) => !!c && S.role === 'vendor' && (ps || histPasses()).some(p => p.cid === c.id && p.status === 'released');
-    const soldFor = (c, ps) => soldOut(c) || vSold(c, ps);
+    const soldFor = c => soldOut(c);
     /* ===== Who is part of a lot's story: drives the Sold Out entry in each role's Sales History =====
        vendor  = claimed a portion of the lot (has a pass on it)
        broker  = won the auction (the buyer), or handles escrow passes on it
@@ -3449,7 +3509,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       if (S.role === 'broker') return S.uid && c.winner_id === S.uid ? `You bought this lot at ${fmt(c.bid)}/kg` : `You handled ${kg} kg of vendor passes`;
       return 'You logged this lot'
     }
-    const lotTag = c => c && soldFor(c) ? `<span class="badge ${c.closed ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'} h-fit">${c.closed ? 'Closed' : 'Sold out'}</span>` : c && ongoing(c) ? `<span class="badge bg-amber-100 text-amber-800 h-fit">On-going transaction</span>` : '';
+    const lotTag = c => c && soldFor(c) ? `<span class="badge ${c.closed ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'} h-fit">${c.closed ? 'Closed' : 'Sold out'}</span>` : '';
     const histPasses = () => { if (S.passes.length) return S.passes; try { return JSON.parse(localStorage.getItem('deal-hist-' + S.uid)) || [] } catch (e) { return [] } };
     const dtx = x => x ? new Date(x).toLocaleString() : '—', tsn = x => { const d = Date.parse(x); return isNaN(d) ? 0 : d };
     const lotLast = (c, ps) => Math.max(tsn(c.sold_out_at), tsn(lsMap(SEENK())[c.id]), tsn(c.settled_at), tsn(c.created_at), ...ps.filter(p => p.cid === c.id).map(p => Math.max(tsn(p.created_at), tsn(p.scanned_at))));
@@ -3497,16 +3557,18 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
         + `<div class="flex gap-2 overflow-x-auto mb-4" role="group" aria-label="History filter">${pills.map(([k, t, c]) => `<button class="pill border ${HF === k ? 'on' : ''}" aria-pressed="${HF === k}" onclick="HF='${k}';render()">${t} · ${c}</button>`).join('')}</div>`
         + (l.length ? l.map(e => `<div class="card p-4 mb-3 flex flex-wrap justify-between gap-3 items-center"><div class="min-w-0"><span class="badge ${HK[e.k][1]}">${HK[e.k][0]}</span><div class="font-mono text-xs text-slate-500 mt-1">${e.id}${e.ref ? ' · ' + e.ref : ''}</div><b>${e.title}</b><div class="text-sm">${e.qty}${e.price != null && !isNaN(e.price) ? ' · ' + fmt(e.price) + '/kg' : ''}</div><div class="text-xs text-slate-500">${e.note} · ${dtx(e.ts)}</div>${e.who ? `<div class="text-xs font-semibold text-[#0B4A5D] mt-0.5">${e.who}</div>` : ''}</div>${e.total != null ? `<div class="text-right"><div class="text-xs text-slate-500">Total</div><div class="font-mono font-bold text-lg">${fmt(e.total)}</div></div>` : ''}</div>`).join('') : '<p class="text-slate-500">Nothing here yet. Auctions, claims, payments and deliveries appear as they happen.</p>')
     }
-    const sfBar = () => `<div class="mb-4 flex items-center gap-2 overflow-x-auto pb-1">${S.role === 'vendor' ? `<button type="button" class="pill border shrink-0" onclick="SF='all';S.tab='floor';render()">&larr; Fresh Catches</button>` : ''}${[['all', 'All'], ['ongoing', 'On-going'], ['sold', 'Sold Out'], ['closed', 'Closed']].map(([k, l]) => `<button type="button" class="pill border shrink-0 ${SF === k ? 'on' : ''}" aria-pressed="${SF === k}" onclick="SF='${k}';render()">${l}</button>`).join('')}</div>`;
+    const isDelivering = c => !!c && ordRead().some(o => o.cid === c.id && o.kind === 'vendor_sale' && (o.status === 'In Transit' || o.status === 'Accepted'));
+    const sfBar = () => `<div class="mb-4 flex items-center gap-2 overflow-x-auto pb-1">${S.role === 'vendor' ? `<button type="button" class="pill border shrink-0" onclick="SF='all';S.tab='floor';render()">&larr; Fresh Catches</button>` : ''}${[['ongoing', 'On-going Transaction'], ['sold', 'Sold Out']].map(([k, l]) => `<button type="button" class="pill border shrink-0 ${SF === k ? 'on' : ''}" aria-pressed="${SF === k}" onclick="SF='${k}';render()">${l}</button>`).join('')}</div>`;
     function soldV() {
-      const ps = histPasses(), l = S.catches.filter(c => fullyClaimed(c) || ongoing(c) || vSold(c, ps)).filter(c => SF === 'all' || (SF === 'closed' ? !!c.closed : SF === 'ongoing' ? ongoing(c) && !vSold(c, ps) : soldFor(c, ps) && !c.closed)).sort((a, b) => lotLast(b, ps) - lotLast(a, ps));
-      return h1('Sold Out / Closed Catches', `${l.length} lot(s) sold out, closed or on-going. Fully claimed lots no longer appear on Fresh Catches.`)
+      const ps = histPasses(), mode = SF === 'ongoing' ? 'ongoing' : 'sold';
+      const l = S.catches.filter(c => mode === 'ongoing' ? isDelivering(c) : fullyClaimed(c)).sort((a, b) => lotLast(b, ps) - lotLast(a, ps));
+      return h1(mode === 'ongoing' ? 'On-going Transactions' : 'Sold Out Catches', mode === 'ongoing' ? `${l.length} lot(s) currently being delivered.` : `${l.length} sold out lot(s). Fully claimed lots no longer appear on Fresh Catches.`)
         + sfBar() + `<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${l.map(c => {
           const cp = ps.filter(p => p.cid === c.id), held = cp.filter(p => p.status === 'escrow').length, kg = cp.reduce((a, p) => a + (+p.kg || 0), 0);
           return `<div class="card overflow-hidden flex flex-col"><div class="h-24 bg-gradient-to-br from-[#0B4A5D] to-[#006878] p-3 flex justify-between"${c.photo ? ` style="background:url(${c.photo}) center/cover"` : ''}><span></span><span class="font-mono text-xs text-white/80">${c.id}</span></div>
   <div class="p-4 flex flex-1 flex-col"><h3 class="font-semibold text-lg min-h-[3.5rem]">${c.name}</h3>
   <div class="flex justify-between items-end my-2"><span class="font-mono text-2xl font-bold">${fmt(c.price)}/kg</span><span class="text-sm font-mono">${c.kg} kg / tub</span></div>
-  <div class="text-xs text-slate-500">${lotTag(c)} ${c.closed ? 'All escrow released.' : vSold(c, ps) && !fullyClaimed(c) ? 'Your QR pass was scanned. Your portion is sold out.' : ongoing(c) ? 'Claiming is paused until the cash pickup QR is scanned.' : held ? held + ' escrow pass(es) still held.' : 'Fully claimed and paid.'}</div>
+  <div class="text-xs text-slate-500">${lotTag(c)} ${mode === 'ongoing' ? 'Order is currently being delivered.' : c.closed ? 'All escrow released.' : held ? held + ' escrow pass(es) still held.' : 'Fully claimed and paid.'}</div>
   ${kg ? `<div class="text-xs text-slate-500">${kg} kg claimed in total</div>` : ''}${myPart(c, ps) ? `<div class="text-xs font-semibold text-[#0B4A5D] mt-1">${myPart(c, ps)}</div>` : ''}${c.settled_at && c.winner_id ? `<div class="text-xs text-slate-500">Auction winner ${bidder(c.winner_id, c.winner_ident)}</div>` : ''}
   <div class="text-xs text-slate-500">Last activity ${dtx(new Date(lotLast(c, ps)).toISOString())}</div>
   <div class="mt-auto pt-2 min-h-[1.75rem]">${c.verified ? `<button class="text-xs text-[#006878] font-semibold" data-k="insp-${c.id}" onclick="run(this,'Loading photos…',()=>viewInsp('${c.id}'))">View inspection photos</button>` : ''}</div></div></div>`
@@ -3567,7 +3629,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       a.innerHTML = head() + nav() + `<main class="max-w-6xl mx-auto p-4 pb-28">${view()}</main>` + bottom() + idModal() + evModal() + portionModal() + payModal() + bpModal() + brModal() + passModal() + sbModal() + ndModal() + tourUI(); if (S.tab === 'taripa') calc(); iconify(a); trDom(a); paintBusy(); evChk(); navFix(); requestAnimationFrame(tourPos); if (S.tour) setTimeout(tourPos, 320)
     }
     addEventListener('online', () => { render(); if (S.user && S.queue.length) toast('Back online. Open Offline Sync to send saved claims.') }); addEventListener('offline', render);
-    (async () => { const C = window.DEAL_CONFIG || {}; if (C.url && C.key && window.supabase) { sb = supabase.createClient(new URL(C.url.trim()).origin, C.key.trim(), { auth: { persistSession: true, autoRefreshToken: true } }); try { await enter() } catch (e) { } } render() })();
+    (async () => { const C = window.DEAL_CONFIG || {}; if (C.url && C.key && window.supabase) { sb = supabase.createClient(new URL(C.url.trim()).origin, C.key.trim(), { auth: { persistSession: true, autoRefreshToken: true } }); sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') clearStaleAuthTokens() }); try { await enter() } catch (e) { clearStaleAuthTokens() } } render() })();
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('/sw.js').catch(() => { });
   </script>
 </body>
