@@ -1637,10 +1637,10 @@
     const DATA_EPOCH = 'reset-2026-11-b';
     try { if (localStorage.getItem('deal-epoch') !== DATA_EPOCH) { Object.keys(localStorage).filter(k => /^(deal-cache|deal-q|deal-hist-|deal-pay-|deal-bidpay-|deal-bp-|deal-logged-|deal-soldseen-|deal-orders-v1|deal-ord-cleared|deal-notif-v1)/.test(k)).forEach(k => localStorage.removeItem(k)); localStorage.setItem('deal-ord-cleared', String(Date.now())); localStorage.setItem('deal-epoch', DATA_EPOCH) } } catch (e) { }
     const LS = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch (e) { return d } };
-    let S = { mute: localStorage.getItem('deal-mute') === '1', notes: [], unread: 0, uid: null, bids: [], live: 'off', bidIn: {}, lastLoad: 0, user: null, role: null, tab: 'floor', lang: 'EN', catches: LS('deal-cache', []), passes: [], queue: LS('deal-q', []), checks: [], sel: null, offline: false, dark: false };
+    let S = { mute: localStorage.getItem('deal-mute') === '1', notes: [], unread: 0, uid: null, bids: [], live: 'off', bidIn: {}, lastLoad: 0, user: null, role: null, tab: 'floor', lang: 'EN', catches: LS('deal-cache', []), passes: [], queue: [], checks: [], sel: null, offline: false, dark: false };
     //-> Function: save()
     //-> Stores the pending queue, language, theme, and catch cache in localStorage; catch photos are intentionally omitted.
-    const save = () => { try { localStorage.setItem('deal-q', JSON.stringify(S.queue)); localStorage.setItem('deal-lang', JSON.stringify(S.lang)); localStorage.setItem('deal-dark', S.dark ? '1' : '0'); localStorage.setItem('deal-cache', JSON.stringify(S.catches.map(({ photo, ...r }) => r))) } catch (e) { } };
+    const save = () => { try { if (S.uid) localStorage.setItem('deal-q-' + S.uid, JSON.stringify(S.queue)); localStorage.setItem('deal-lang', JSON.stringify(S.lang)); localStorage.setItem('deal-dark', S.dark ? '1' : '0'); localStorage.setItem('deal-cache', JSON.stringify(S.catches.map(({ photo, ...r }) => r))) } catch (e) { } };
     let sb, AM = 'in', fails = 0, lockUntil = 0, idle, ch;
     const esc = s => String(s ?? '').replace(/[&<>"'`]/g, '');
     const online = () => !S.offline && navigator.onLine;
@@ -1721,14 +1721,68 @@
         : '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
       playAudio('nav');
     }
+    // ---> offline sign-in: a salted PBKDF2 hash of the password, kept only on devices that ticked "Remember this device" <---
+    const WRONG = 'Wrong ID or password', OFFK = 'deal-offline-cred', OFF_ITER = 150000;
+    let OFFPW = null, RESUMING = false;
+    const isNetErr = e => !navigator.onLine || /fetch|network|timeout|load failed|retryable|failed to/i.test(String((e && (e.message || e.name)) || e)) || !!(e && e.status === 0);
+    const b64 = u => btoa(String.fromCharCode.apply(null, u)), unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    const netTimeout = ms => new Promise((_, no) => setTimeout(() => no(new Error('network timeout')), ms));
+    async function credHash(pw, salt, iter) {
+      const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(pw)), 'PBKDF2', false, ['deriveBits']);
+      return b64(new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, k, 256)))
+    }
+    //-> Function: credSave(email, password)
+    //-> After a successful online sign-in, stores a salted hash (never the password) plus the profile needed to open the workspace offline.
+    async function credSave(email, pw) {
+      try {
+        const salt = crypto.getRandomValues(new Uint8Array(16)), m = LS(OFFK, {});
+        m[email] = { salt: b64(salt), iter: OFF_ITER, hash: await credHash(pw, salt, OFF_ITER), ts: Date.now(), profile: { id: S.uid, role: S.role, ident: S.user, full_name: S.name, avatar: S.avatar || null, station: S.station || null } };
+        localStorage.setItem(OFFK, JSON.stringify(m))
+      } catch (e) { }
+    }
+    async function credAfterLogin(email, pw) {
+      if (S.rem === false) { try { const m = LS(OFFK, {}); delete m[email]; localStorage.setItem(OFFK, JSON.stringify(m)) } catch (e) { } return }
+      await credSave(email, pw)
+    }
+    //-> Function: offlineLogin(email, password)
+    //-> Opens the saved workspace only when the typed password matches the cached hash for that ID and the selected portal; otherwise returns false.
+    async function offlineLogin(email, pw) {
+      const e = LS(OFFK, {})[email], p = e && e.profile; if (!e || !p || !e.hash || !e.salt) return false;
+      let ok = false; try { ok = (await credHash(pw, unb64(e.salt), e.iter || OFF_ITER)) === e.hash } catch (x) { }
+      if (!ok || p.role !== LR || !TABS[p.role]) return false;
+      OFFPW = pw; S.offEmail = email; S.offlineSession = true;
+      S.dark = false; S.user = p.ident; S.name = p.full_name || p.ident; S.avatar = p.avatar || null; S.uid = p.id; S.role = p.role; S.tutDue = false; S.station = p.station || 'Pier 1-3'; S.tab = TABS[p.role][0][0];
+      userScope();
+      S.catches = LS('deal-cache', []); S.bids = []; S.checks = [];
+      S.passes = LS('deal-hist-' + S.uid, []).filter(passMine).map(x => ({ ...x, t: new Date(x.created_at).toLocaleString() }));
+      S.sel = S.catches[0] && S.catches[0].id;
+      startAuctionLoops(); bump(); render(); return true
+    }
+    async function offlineAttempt(email, pw) {
+      if (await offlineLogin(email, pw)) { fails = 0; toast('Signed in offline. Showing your saved data. New changes sync when you reconnect.'); return }
+      if (++fails >= 5) { fails = 0; lockUntil = Date.now() + 60000 }
+      toast(WRONG, 1)
+    }
+    //-> Function: resumeOnline()
+    //-> When the network returns during an offline session, signs in to Supabase again with the in-memory password and reloads live data.
+    async function resumeOnline() {
+      if (RESUMING || !S.offlineSession || !OFFPW || !S.offEmail || !sb || !online()) return;
+      RESUMING = true;
+      try {
+        let r; try { r = await Promise.race([sb.auth.signInWithPassword({ email: S.offEmail, password: OFFPW }), netTimeout(12000)]) } catch (e) { r = { error: e } }
+        if (r.error) { if (isNetErr(r.error)) return; await logout(); return toast('Your saved sign-in is no longer valid. Please sign in again.', 1) }
+        S.loaded = 0; if (await enter()) toast('Back online. Your data is up to date.')
+      } finally { RESUMING = false }
+    }
     //-> Function: doLogin()
     //-> Validates the selected role's identifier and password, then signs in or registers through Supabase.
     //-> Staff account creation also claims a registered identity/PIN; validation and server errors are shown to the user.
     async function doLogin() {
       S.rem = !($('#f6') && !$('#f6').checked);
       if (signBlocked()) { signChk(1); return toast('Please agree to the Terms of Service and accept the Privacy Policy to create an account.', 1) }
-      if (!sb) return toast('Add your Supabase URL and anon key to config.js first.', 1);
+      if (!sb && online()) return toast('Add your Supabase URL and anon key to config.js first.', 1);
       const wait = Math.ceil((lockUntil - Date.now()) / 1000); if (wait > 0) return toast(`Too many attempts. Try again in ${wait}s.`, 1);
+      if (AM === 'up' && !online()) return toast('You need an internet connection to create an account.', 1);
       if (AM === 'up' && LR !== 'vendor') return staffSignup();
       const a = vl('f1').trim(), p = vl('f2'), fn = AM === 'up' ? vl('f0').trim().replace(/\s+/g, ' ') : '', re = { vendor: /^09\d{2}-?\d{3}-?\d{4}$/, checker: /^TC-NAV-\d+$/i, broker: /^BKR-NAV-\d+$/i }[LR];
       if (!re.test(a)) return toast(`Enter a valid ${LBL[LR][0]} (${LBL[LR][1]}).`, 1);
@@ -1747,11 +1801,12 @@
           if (q.error || (need && q.data !== 'ok')) { await sb.auth.signOut(); return toast(q.data === 'locked' ? 'Too many wrong PIN attempts. Contact the pilot admin.' : q.data === 'denied' ? 'This ID or PIN is not recognized. Contact the pilot admin.' : /duplicate|already/i.test((q.error && q.error.message) || '') ? 'This ID already has an account. Try signing in.' : 'Could not create the profile. Check your ID format and try again.', 1) }
           tutPend(r.data.user.id)
         }
-        AM = 'in'; await enter(LR); return
+        AM = 'in'; if (await enter(LR)) await credAfterLogin(email, p); return
       }
-      const { error } = await sb.auth.signInWithPassword({ email, password: p });
-      if (error) { if (++fails >= 5) { fails = 0; lockUntil = Date.now() + 60000 } return toast('Wrong ID or password.', 1) }
-      fails = 0; await enter(LR)
+      if (!online()) return offlineAttempt(email, p);
+      let error; try { ({ error } = await Promise.race([sb.auth.signInWithPassword({ email, password: p }), netTimeout(12000)])) } catch (e) { error = e }
+      if (error) { if (isNetErr(error)) return offlineAttempt(email, p); if (++fails >= 5) { fails = 0; lockUntil = Date.now() + 60000 } return toast(WRONG, 1) }
+      fails = 0; OFFPW = null; if (await enter(LR)) await credAfterLogin(email, p)
     }
     //-> Function: staffSignup()
     //-> Creates a checker or broker account from the submitted name, password, pier, and optional phone number.
@@ -1767,7 +1822,7 @@
       if (r.error || !r.data.session) return toast(r.error ? r.error.message : 'Sign-up needs "Confirm email" turned off in Supabase.', 1);
       const q = await sb.rpc('create_staff_profile', { p_role: LR, p_ident: id, p_name: name, p_station: st, p_phone: ph || null });
       if (q.error) { await sb.auth.signOut(); return toast('Could not create the profile. Try again.', 1) }
-      tutPend(r.data.user.id); S.newId = id; AM = 'in'; await enter(LR)
+      tutPend(r.data.user.id); S.newId = id; AM = 'in'; if (await enter(LR)) await credAfterLogin(id.replace(/-/g, '').toLowerCase() + '@deal-navotas.app', p)
     }
     function clearStaleAuthTokens() {
       try {
@@ -1796,11 +1851,11 @@
       if (!user) return false;
       const { data: p } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (!p || !p.approved || (want && p.role !== want)) { await sb.auth.signOut(); toast(!p ? 'No profile found for this account.' : !p.approved ? 'Account is awaiting admin approval.' : 'This account is not registered for this portal.', 1); return false }
-      if (want && S.rem !== false) accSave(p.role, p.ident); if (want) S.dark = false; S.user = p.ident; S.name = p.full_name || p.name || p.ident; S.avatar = p.avatar_url || p.avatar || null; S.uid = user.id; S.role = p.role; S.tutDue = tutDueFor(user.id); S.station = p.station || 'Pier 1-3'; S.tab = TABS[p.role][0][0];
+      if (want && S.rem !== false) accSave(p.role, p.ident); if (want) S.dark = false; S.user = p.ident; S.name = p.full_name || p.name || p.ident; S.avatar = p.avatar_url || p.avatar || null; S.uid = user.id; S.role = p.role; S.tutDue = tutDueFor(user.id); S.station = p.station || 'Pier 1-3'; S.tab = TABS[p.role][0][0]; S.offlineSession = false; userScope();
       try { await devSync(!!want); await prefsPull(); S.tutDue = tutDueFor(user.id) } catch (e) { }
-      await load(1); ch = sb.channel('deal').on('postgres_changes', { event: '*', schema: 'public' }, () => load(1)).subscribe(liveStatus); startAuctionLoops(); bump(); render(); return true
+      await load(1); if (ch) { try { sb.removeChannel(ch) } catch (e) { } } ch = sb.channel('deal').on('postgres_changes', { event: '*', schema: 'public' }, () => load(1)).subscribe(liveStatus); startAuctionLoops(); bump(); render(); return true
     }
-    async function logout() { S.lang = 'EN'; S.dark = false; closeScanner(); S.pm = null; S.pay = null; S.pass = null; S.bp = null; S.br = null; try { await sb.auth.signOut({ scope: 'local' }); if (ch) sb.removeChannel(ch) } catch (e) { } clearStaleAuthTokens(); stopAuctionLoops(); SQ = ''; SF = 'all'; S.name = null; S.user = null; S.uid = null; S.live = 'off'; S.bids = []; S.catches = []; S.passes = []; S.checks = []; render() }
+    async function logout() { S.lang = 'EN'; S.dark = false; closeScanner(); S.pm = null; S.pay = null; S.pass = null; S.bp = null; S.br = null; try { await sb.auth.signOut({ scope: 'local' }); if (ch) sb.removeChannel(ch) } catch (e) { } clearStaleAuthTokens(); stopAuctionLoops(); SQ = ''; SF = 'all'; S.queue = []; S.ordStatus = {}; S.offlineSession = false; S.offEmail = null; OFFPW = null; S.name = null; S.user = null; S.uid = null; S.live = 'off'; S.bids = []; S.catches = []; S.passes = []; S.checks = []; render() }
     addEventListener('storage', async e => {
       if (e.key && /^sb-.*-auth-token/.test(e.key) && S.uid) {
         try {
@@ -1816,15 +1871,17 @@
     //-> Function: load(force)
     //-> Refreshes the current user's catches and role-specific records from Supabase, then updates app state for rendering.
     async function load(q) {
+      if (S.offlineSession) { if (online()) await resumeOnline(); return }
+      await flushOrderOutbox();
       /* a countdown may have run out while nobody was looking: let the database close it first */
       if (S.catches.some(x => x.auction_ends && !x.settled_at && Date.parse(x.auction_ends) <= Date.now())) await sb.rpc('settle_due_auctions');
-      const [c, p, k, b] = await Promise.all([sb.from('catches').select('*').order('id'), sb.from('passes').select('*').order('created_at', { ascending: false }), sb.from('checks').select('id,cid,name,res,by_name,created_at').order('created_at', { ascending: false }).limit(500),
-      S.role === 'broker' ? sb.from('bids').select('id,cid,broker_id,broker_ident,amount,created_at').order('created_at', { ascending: false }).limit(300) : Promise.resolve({ data: [] })]);
+      const [c, p, k, b, os] = await Promise.all([sb.from('catches').select('*').order('id'), sb.from('passes').select('*').order('created_at', { ascending: false }), sb.from('checks').select('id,cid,name,res,by_name,created_at').order('created_at', { ascending: false }).limit(500),
+      S.role === 'broker' ? sb.from('bids').select('id,cid,broker_id,broker_ident,amount,created_at').order('created_at', { ascending: false }).limit(300) : Promise.resolve({ data: [] }), sb.from('order_status').select('order_id,cid,status,updated_at').then(r => r, () => ({ data: null, error: true }))]);
       if (c.error) return toast('Could not load data. Showing the last saved copy.', 1);
       const old = Object.fromEntries(S.catches.map(x => [x.id, x]));
       S.catches = c.data.map(x => { ['name', 'sci', 'src', 'bid_by_ident', 'winner_ident'].forEach(f => x[f] = esc(x[f])); x.bid = +x.bid; x.bid_count = +x.bid_count || 0; if (!/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(x.photo || '')) x.photo = null; return normLot(x) });
       S.bids = (b.data || []).map(x => ({ ...x, broker_ident: esc(x.broker_ident), amount: +x.amount }));
-      S.passes = (p.data || []).map(x => ({ ...x, name: esc(x.name), t: new Date(x.created_at).toLocaleString() }));
+      S.passes = (p.data || []).filter(passMine).map(x => ({ ...x, name: esc(x.name), t: new Date(x.created_at).toLocaleString() }));
       try { localStorage.setItem('deal-hist-' + S.uid, JSON.stringify(S.passes.map(({ pass_token, ...r }) => r))) } catch (e) { }
       S.checks = (k.data || []).map(x => ({ id: x.cid, name: esc(x.name), res: x.res, by: esc(x.by_name), t: new Date(x.created_at).toLocaleString(), iso: x.created_at, rid: Number(x.id) }));
       if (!p.error && S.catches.length === 0 && S.passes.length === 0) {
@@ -1848,7 +1905,9 @@
         }
         if (!o.verified && x.verified) noteFor(['checker', 'broker'], 'Inspection update', `${x.id} passed Suri-Isda.`); if (o.verified && !x.verified) noteFor(['checker', 'broker'], 'Inspection update', `${x.id} flagged for review.`)
       }
+      if (os && !os.error) S.ordStatus = Object.fromEntries((os.data || []).map(r => [r.order_id, r]));
       if (typeof syncPierAcquisitions === 'function') syncPierAcquisitions(S.catches, S.loaded);
+      applyOrderStatus(S.loaded);
       if (typeof syncVendorOrdersFromPasses === 'function') syncVendorOrdersFromPasses(S.passes);
       S.loaded = 1; S.upd = new Date().toLocaleTimeString(); S.lastLoad = Date.now();
       if (!find(S.sel)) S.sel = S.catches[0] && S.catches[0].id;
@@ -2206,19 +2265,28 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       bpSave(id, { method, ref: (method === 'cashless' ? 'DEMO-' : 'CASH-') + rnd, at: new Date().toISOString(), kg, bid, total: +t.total.toFixed(2) });
       S.bp = null; S.br = id; toast('Payment received. Your receipt is ready.'); render()
     }
+    //-> Function: payQr(lot)
+    //-> The broker's hand-off QR. It is drawn only on the Payment screen of a won lot, and never for a cancelled or rejected order.
+    const payQr = c => {
+      let o = ordRead().find(x => x.id === 'ACQ-' + c.id);
+      if (!o) { syncPierAcquisitions([c], false); o = ordRead().find(x => x.id === 'ACQ-' + c.id) }
+      if (!o) return '';
+      if (o.status === 'Cancelled' || o.status === 'Rejected') return `<p role="note" class="mt-3 text-xs font-semibold text-red-800 bg-red-50 border border-red-300 rounded-lg p-2">This order was ${o.status === 'Cancelled' ? 'cancelled' : 'rejected'}, so no hand-off QR is available.</p>`;
+      return `<div class="mt-3"><div class="text-xs font-mono text-slate-500 uppercase">Hand-off QR for the Pier Checker</div><div class="qr-frame rounded-xl p-2 mx-auto my-2 max-w-[200px] border border-slate-200 bg-white">${qrSvg(orderQrPayload(o))}</div></div>`
+    };
     const brModal = () => {
       const id = S.br; if (!id) return ''; const c = find(id), p = bpOf(id); if (!c || !p) { S.br = null; return '' }
       return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-sm p-5 text-center" role="dialog" aria-modal="true" aria-label="Payment receipt"><span class="badge bg-emerald-100 text-emerald-800">Paid</span>
   <h2 class="font-mono font-bold text-lg mt-2">Payment received</h2>
   <div class="text-left mt-3">${kv('Receipt no.', 'BID-' + esc(c.id))}${kv('Catch', c.name)}${kv('Winning bid', fmt(p.bid) + '/kg')}${kv('Weight', p.kg + ' kg')}${kv('Payment', payLbl(p.method))}${kv('Reference', esc(p.ref))}${kv('Total paid', fmt(p.total))}</div>
   ${p.method === 'cashless' ? `<p role="note" class="mt-3 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg p-2">This cashless payment is for demo only. No real money is charged.</p>` : ''}
-  <button class="btn2 mt-3 w-full" onclick="dlBidReceipt('${esc(c.id)}')">Download receipt</button><button class="btn mt-2" onclick="S.br=null;render()">Done</button></div></div>`
+  ${payQr(c)}<button class="btn2 mt-3 w-full" onclick="dlBidReceipt('${esc(c.id)}')">Download receipt</button><button class="btn mt-2" onclick="S.br=null;render()">Done</button></div></div>`
     };
     //-> Function: bpCard(lot)
     //-> Renders the "you won" card on the selected lot: payment due with a button, or paid with a receipt download.
     const bpCard = c => {
       if (!bpWon(c)) return ''; const p = bpOf(c.id), t = tar(c.bid, +c.kg);
-      return p ? `<div class="rounded-lg p-3 text-sm mt-3 bg-emerald-50 border border-emerald-200"><div class="flex flex-wrap justify-between items-center gap-2"><span>✅ <b>Final bid paid</b> · <span>${payLbl(p.method)}</span> · <b class="font-mono">${fmt(p.total)}</b></span><button class="btn2 !py-1.5" onclick="dlBidReceipt('${esc(c.id)}')">Download receipt</button></div></div>`
+      return p ? `<div class="rounded-lg p-3 text-sm mt-3 bg-emerald-50 border border-emerald-200"><div class="flex flex-wrap justify-between items-center gap-2"><span>✅ <b>Final bid paid</b> · <span>${payLbl(p.method)}</span> · <b class="font-mono">${fmt(p.total)}</b></span><span class="flex flex-wrap gap-2"><button class="btn2 !py-1.5" onclick="bpOpen('${esc(c.id)}')">View payment QR</button><button class="btn2 !py-1.5" onclick="dlBidReceipt('${esc(c.id)}')">Download receipt</button></span></div></div>`
         : `<div class="rounded-lg p-3 text-sm mt-3 bg-amber-50 border border-amber-300"><div>🏆 <b>You won this lot</b> · <span>Payment due</span> <b class="font-mono">${fmt(t.total)}</b></div><button class="btn mt-2" onclick="bpOpen('${esc(c.id)}')">Choose payment method</button></div>`
     };
     //-> Function: wonList()
@@ -2544,7 +2612,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
           : state === 'live' ? `<div class="rounded-lg p-3 text-sm mt-3 border ${mine ? 'bg-emerald-50 border-emerald-200' : iBid(c.id) ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}"><div class="flex justify-between gap-2"><b>${mine ? 'You are winning this lot' : iBid(c.id) ? 'You were outbid. Raise your bid to take the lead.' : '<span>Top bid held by</span> ' + bidder(c.bid_by, c.bid_by_ident)}</b><span class="font-mono whitespace-nowrap">${endTag(c)}</span></div></div>`
             : state === 'open' ? `<div class="rounded-lg p-3 text-sm mt-3 bg-slate-50 border border-slate-200">No bids yet. The first bid starts the 1-minute closing clock.</div>` : '';
       const form = canBid ? `<div class="mt-3"><label class="lbl !mt-0" for="bidAmt">Your bid (₱/kg)</label><div class="flex gap-2"><input id="bidAmt" type="number" inputmode="decimal" step="0.5" min="${min}" value="${val}" class="inp flex-1 font-mono text-lg" oninput="S.bidIn['${c.id}']=this.value" onkeydown="if(event.key==='Enter')document.querySelector('[data-k=\\'bid-${c.id}\\']').click()"><button class="btn !w-auto px-5" data-k="bid-${c.id}" ${mine ? 'disabled' : ''} onclick="run(this,'Placing bid…',()=>placeBid('${c.id}'))">Place bid</button></div>
-  <div class="flex flex-wrap items-center gap-2 mt-2 text-xs"><span class="text-slate-500">Minimum next bid</span><b class="font-mono">${fmt(min)}/kg</b><span class="grow"></span>${[[`Min`, min], ['+₱5', Math.max(min, top + 5)], ['+₱10', Math.max(min, top + 10)]].map(([l, x]) => `<button type="button" class="pill border" onclick="setBid('${c.id}',${x})">${l === 'Min' ? '<span>Min</span>' : l}</button>`).join('')}</div>${mine ? '<div class="text-xs text-emerald-700 mt-2">You hold the top bid.</div>' : ''}</div>` : '';
+  <div class="flex flex-wrap items-center gap-2 mt-2 text-xs"><span class="text-slate-500">Minimum next bid</span><b class="font-mono">${fmt(min)}/kg</b><span class="grow"></span>${[['Min', 0], ['+₱5', 5], ['+₱10', 10]].map(([l, st]) => `<button type="button" class="pill border" onclick="${st ? `bumpBid('${c.id}',${st})` : `setBid('${c.id}',${min})`}">${l === 'Min' ? '<span>Min</span>' : l}</button>`).join('')}</div>${mine ? '<div class="text-xs text-emerald-700 mt-2">You hold the top bid.</div>' : ''}</div>` : '';
       const rows = act.map(x => { const s = LOT_BADGE[lotState(x)], xEnd = biddingEndsAt(x); return `<tr tabindex="0" onclick="S.sel='${x.id}';render()" class="border-t cursor-pointer ${x.id === c.id ? 'bg-teal-50' : 'hover:bg-slate-50'}"><td class="p-3"><b class="font-mono">${x.id}</b><br><span class="text-xs">${x.name}</span></td><td>${x.kg}kg × ${x.tubs}</td><td class="font-mono">${fmt(x.bid)}${x.bid_count ? `<div class="text-xs font-sans ${x.bid_by === S.uid ? 'text-emerald-600' : 'text-slate-500'}">${x.bid_by === S.uid ? '<span>You lead</span>' : bidder(x.bid_by, x.bid_by_ident)}</div>` : ''}</td><td><span class="badge ${s[1]}">${s[0]}</span>${lotState(x) === 'live' ? `<div class="text-xs font-mono mt-1" data-end="${xEnd}" data-lot="${x.id}">${mmss(Date.parse(xEnd) - Date.now())} remaining</div>` : ''}${bpWon(x) ? `<div class="text-xs mt-1 ${bpOf(x.id) ? 'text-emerald-700' : 'text-amber-700 font-semibold'}">${bpOf(x.id) ? 'Paid' : 'Payment due'}</div>` : ''}</td></tr>` }).join('');
       return head + `<div class="grid grid-cols-3 gap-3 mb-4">${[['Active lots', v.length], ['Tubs in stock', act.reduce((a, x) => a + x.tubs, 0)]].map(([a, b]) => `<div class="card p-4"><div class="text-xs font-mono text-slate-500">${a}</div><div class="font-mono text-2xl font-bold">${b}</div></div>`).join('')}<div class="card p-4"><div class="text-xs font-mono text-slate-500">Live bids</div><div id="liveTile" class="font-mono font-bold ${lc}" aria-live="polite">${lt}</div></div></div>
 <div class="grid lg:grid-cols-2 gap-4 items-start"><div class="card overflow-x-auto"><table class="w-full text-sm"><thead class="text-xs font-mono text-left text-slate-500"><tr><th class="p-3">Batch</th><th>Volume</th><th>Top bid</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>
@@ -2557,6 +2625,15 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     //-> Function: setBid(catchId, amount)
     //-> Updates the selected lot's bid input state and focuses the amount field.
     function setBid(id, v) { S.bidIn[id] = v; const e = $('#bidAmt'); if (e) { e.value = v; e.focus() } }
+    //-> Function: bumpBid(catchId, step)
+    //-> Adds step (5 or 10) to the amount currently in the bid field on every click, never below the minimum next bid or above the field's max.
+    function bumpBid(id, step) {
+      const lot = find(id), el = $('#bidAmt'); if (!lot || !(step > 0)) return;
+      const cur = Number(String(el ? el.value : (S.bidIn[id] ?? '')).replace(/,/g, '.')) || 0;
+      let next = Math.max(minNext(lot), +(cur + step).toFixed(2));
+      const mx = el && el.max !== '' ? Number(el.max) : NaN; if (Number.isFinite(mx)) next = Math.min(next, mx);
+      setBid(id, next)
+    }
     const BIDMSG = d => d.code === 'too_low' ? `Bid at least ${fmt(d.min)}/kg.` : d.code === 'too_high' ? `Starting bid cannot exceed the base price (${fmt(d.max)}/kg).` : d.message;
     //-> Function: placeBid(catchId)
     //-> Reads the bid amount, sends it to the Supabase place_bid RPC, reports validation results, then reloads the auction state.
@@ -2802,6 +2879,85 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
 
     // ---> unified "Orders" system: All Orders, To Receive, To Rate, Chatbox, Call/SMS & Ratings <---
     const ORD_K = 'deal-orders-v1';
+    // ---> transaction privacy: every list is filtered by the signed-in user's id and role, in state, storage and UI <---
+    const chkAssigned = c => !!c && S.role === 'checker' && !!S.uid && (c.logged_by ? c.logged_by === S.uid : !!S.station && String(c.src || '').endsWith(S.station));
+    //-> Function: passMine(pass)
+    //-> True only for the vendor who owns the pass, the broker who won the lot, or the Pier Checker assigned to the lot.
+    function passMine(p) {
+      if (!p || !S.uid) return false;
+      if (S.role === 'vendor') return p.vendor_id ? p.vendor_id === S.uid : (!!p.vendor_ident && p.vendor_ident === S.user);
+      const lot = find(p.cid || p.catch_id);
+      if (S.role === 'broker') return p.broker_id === S.uid || (!!lot && lot.winner_id === S.uid);
+      if (S.role === 'checker') return chkAssigned(lot);
+      return false
+    }
+    const ordMine = o => {
+      if (!o || !S.uid) return false;
+      if (S.role === 'vendor') return o.kind === 'vendor_sale' && (o.vendorId ? o.vendorId === S.uid : (!!o.vendorIdent && o.vendorIdent === S.user));
+      if (S.role === 'broker') return o.brokerId ? o.brokerId === S.uid : (!!o.brokerIdent && o.brokerIdent === S.user);
+      if (S.role === 'checker') return o.kind === 'pier_acquisition' && o.checkerId === S.uid;
+      return false
+    };
+    const ORD_V = 'deal-orders-v2:', ordTs = o => Date.parse(o && o.updatedAt) || 0;
+    const ordFile = uid => { try { const a = JSON.parse(localStorage.getItem(ORD_V + uid)); return Array.isArray(a) ? a : [] } catch (e) { return [] } };
+    const ordSave = (uid, l) => { try { localStorage.setItem(ORD_V + uid, JSON.stringify(l)) } catch (e) { } };
+    const ordRead = () => S.uid ? ordFile(S.uid).filter(ordMine) : [];
+    //-> Function: ordWrite(list)
+    //-> Saves the signed-in user's own orders. A newer copy is also handed to the other participants of the same order (their own stores), so no store ever holds an order its owner is not part of.
+    const ordWrite = list => {
+      if (!S.uid) return; const mine = (list || []).filter(ordMine); ordSave(S.uid, mine);
+      for (const o of mine) for (const u of new Set([o.vendorId, o.brokerId, o.checkerId])) {
+        if (!u || u === S.uid) continue; const l = ordFile(u), i = l.findIndex(x => x.id === o.id);
+        if (i < 0) l.unshift(o); else if (ordTs(o) > ordTs(l[i])) l[i] = o; else continue;
+        ordSave(u, l)
+      }
+    };
+    //-> Function: ordMigrate()
+    //-> Moves this user's orders out of the old shared storage key; orders of other people stay untouched and unread.
+    function ordMigrate() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(ORD_K)); if (!Array.isArray(raw)) return;
+        const take = raw.filter(ordMine), rest = raw.filter(o => !ordMine(o)), have = ordFile(S.uid);
+        if (take.length) ordSave(S.uid, take.filter(o => !have.some(x => x.id === o.id)).concat(have));
+        if (rest.length) localStorage.setItem(ORD_K, JSON.stringify(rest)); else localStorage.removeItem(ORD_K)
+      } catch (e) { }
+    }
+    //-> Function: userScope()
+    //-> Loads this user's own saved claim queue and orders; nothing from another account is read.
+    function userScope() {
+      S.queue = LS('deal-q-' + S.uid, []);
+      try { localStorage.removeItem('deal-q') } catch (e) { }
+      ordMigrate()
+    }
+    // ---> order cancellation: saved here first, then sent to Supabase and retried until it lands <---
+    const OUTK = () => 'deal-ordq-' + S.uid;
+    let FLUSHING = false; const CANCELLING = new Set();
+    const outRead = () => LS(OUTK(), []), outWrite = l => { try { localStorage.setItem(OUTK(), JSON.stringify(l)) } catch (e) { } };
+    async function flushOrderOutbox() {
+      if (FLUSHING || !sb || !S.uid || S.offlineSession || !online()) return;
+      const q = outRead(); if (!q.length) return; FLUSHING = true;
+      try {
+        const keep = [];
+        for (const x of q) {
+          let r; try { r = await sb.rpc('cancel_order', { p_order_id: x.order_id, p_cid: x.cid }) } catch (e) { r = { error: e } }
+          if (r.error) { if (isNetErr(r.error)) keep.push(x); else toast(r.error.message, 1); continue }
+          if (r.data && r.data.success === false) toast(r.data.message || 'The server could not cancel this order.', 1)
+        }
+        outWrite(keep.concat(outRead().filter(y => !q.some(x => x.order_id === y.order_id))))
+      } finally { FLUSHING = false }
+    }
+    //-> Function: applyOrderStatus(notify)
+    //-> Applies server-side cancellations to the local orders. Cancelled is final and wins over any local Pending or Accepted state.
+    function applyOrderStatus(notify) {
+      const st = S.ordStatus || {}, ids = Object.keys(st).filter(k => st[k] && st[k].status === 'Cancelled'); if (!ids.length) return;
+      const list = ordRead(); let changed = false;
+      for (const id of ids) {
+        const o = list.find(x => x.id === id); if (!o || o.status === 'Cancelled' || o.status === 'Delivered') continue;
+        o.status = 'Cancelled'; o.cancelledBy = 'Consignee Broker'; o.updatedAt = st[id].updated_at || new Date().toISOString(); changed = true;
+        if (notify) noteFor(['checker'], 'Order Cancelled', `${o.cid} (${o.id}) was cancelled by the Broker.`)
+      }
+      if (changed) ordWrite(list)
+    }
     const MARKETS = {
       nepo: { id: 'nepo', name: 'Nepo Market (Malabon)', city: 'Malabon City', km: 4.8, baseMin: 18, feeBase: 120 },
       malabon: { id: 'malabon', name: 'Malabon Central Market', city: 'Malabon City', km: 5.4, baseMin: 20, feeBase: 130 },
@@ -2817,8 +2973,6 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     };
     let ORD_TAB = 'all';
     const ORD_STAR = {};
-    const ordRead = () => { try { const a = JSON.parse(localStorage.getItem(ORD_K)); return Array.isArray(a) ? a : [] } catch (e) { return [] } };
-    const ordWrite = list => { try { localStorage.setItem(ORD_K, JSON.stringify(list)) } catch (e) { } };
     const orderQrToken = o => {
       if (o.qrToken) return o.qrToken;
       let h = 2166136261; const s = `${o.id}|${o.cid}|${o.createdAt || ''}`;
@@ -2828,7 +2982,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     const orderQrPayload = o => (o && o.kind === 'vendor_sale' && o.passId && o.passToken)
       ? `DEAL1|${o.passId}|${o.passToken}`
       : `ORDQR1|${o.id}|${o.cid}|${orderQrToken(o)}`;
-    addEventListener('storage', e => { if (e.key === ORD_K && S.user) render() });
+    addEventListener('storage', e => { if (e.key === ORD_V + S.uid && S.user) render() });
     function calcMarketRoute(marketId, vehicleType = 'L300 Van', kg = 10) {
       const m = MARKETS[marketId] || MARKETS.nepo, f = FLEET_TYPES[vehicleType] || FLEET_TYPES['L300 Van'];
       const etaMinutes = Math.max(10, Math.round(m.baseMin / f.speedFactor));
@@ -2840,7 +2994,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     function syncPierAcquisitions(catches, notifyNew) {
       const list = ordRead(), cut = ordClearedAt(); let changed = false;
       for (const c of (catches || [])) {
-        if (!c.settled_at || !c.winner_id) continue;
+        if (!c.settled_at || !c.winner_id) continue; if (S.role === 'vendor' || (S.role === 'broker' && c.winner_id !== S.uid) || (S.role === 'checker' && !chkAssigned(c))) continue;
         if (cut && Date.parse(c.settled_at) <= cut) continue;
         const id = 'ACQ-' + c.id;
         if (list.some(o => o.id === id)) continue;
@@ -2849,14 +3003,14 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
           id, kind: 'pier_acquisition', cid: c.id, catchName: c.name, kg: +c.kg, pricePerKg: +c.bid,
           total: tar(c.bid, c.kg).total, pierLocation: c.src || 'Navotas Pier 1 Dock',
           checkerIdent: 'TC-NAV-01', checkerPhone: '0917-555-0101',
-          brokerIdent: c.winner_ident || 'Consignee Broker', brokerPhone: '0918-555-0202',
-          status: 'Pending Acceptance', escrowStatus: 'Escrow Held', chats: [], ratings: { checker: null, broker: null },
+          brokerId: c.winner_id, checkerId: c.logged_by || (S.role === 'checker' ? S.uid : null), brokerIdent: c.winner_ident || 'Consignee Broker', brokerPhone: '0918-555-0202',
+          status: (S.ordStatus && S.ordStatus[id] && S.ordStatus[id].status === 'Cancelled') ? 'Cancelled' : 'Pending Acceptance', escrowStatus: 'Escrow Held', chats: [], ratings: { checker: null, broker: null },
           createdAt: now, updatedAt: now
         };
         rec.qrToken = orderQrToken(rec);
         list.unshift(rec);
         changed = true;
-        if (notifyNew) noteFor(['checker'], 'Winning Bid Needs Approval', `${c.id} (${c.name}) won at ${fmt(c.bid)}/kg. Review in Orders.`);
+        if (notifyNew && rec.status !== 'Cancelled') noteFor(['checker'], 'Winning Bid Needs Approval', `${c.id} (${c.name}) won at ${fmt(c.bid)}/kg. Review in Orders.`);
       }
       if (changed) ordWrite(list);
     }
@@ -2877,7 +3031,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
           id: 'ORD-' + String(p.id).replace(/[^A-Za-z0-9]/g, '').slice(-5).toUpperCase(),
           kind: 'vendor_sale',
           passId: p.id,
-          passToken: p.pass_token || null,
+          passToken: p.pass_token || null, vendorId: S.uid, brokerId: lot.winner_id || null,
           cid: p.cid || 'LOT',
           catchName: p.name || lot.name || 'Fresh Catch',
           kg: +p.kg || 0,
@@ -2924,7 +3078,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
         id: 'ORD-' + Date.now().toString(36).slice(-5).toUpperCase(),
         kind: 'vendor_sale',
         passId: (passData && passData.id) || ('PASS-' + Date.now().toString(36).slice(-4).toUpperCase()),
-        passToken: (passData && passData.pass_token) || null,
+        passToken: (passData && passData.pass_token) || null, vendorId: S.uid, brokerId: lot.winner_id || null,
         cid: lot.id, catchName: lot.name, kg: +kg, tubs: Math.max(1, Math.ceil(+kg / (+lot.kg || 25))),
         pricePerKg: +lot.price,
         total: passData && passData.total ? +passData.total : tar(lot.price, kg).total,
@@ -2956,7 +3110,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
         'Rejected': 'bg-red-100 text-red-800',
         'Cancelled': 'bg-slate-200 text-slate-700'
       };
-      return `<span class="badge ${m[status] || 'bg-slate-100 text-slate-700'}">${esc(status)}</span>`;
+      return `<span class="badge ${m[status] || 'bg-slate-100 text-slate-700'}">${esc(status === 'Cancelled' ? 'Order Cancelled' : status)}</span>`;
     }
     function kindBadge(kind) {
       return kind === 'pier_acquisition'
@@ -2971,13 +3125,13 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       return 0;
     }
     function acceptPierBid(id) {
-      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return;
+      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return; if (o.status === 'Cancelled') return toast('This order was cancelled by the Broker.', 1);
       o.status = 'Accepted'; o.qrToken = orderQrToken(o); o.updatedAt = new Date().toISOString(); ordWrite(list);
       noteFor(['checker', 'broker'], 'Pier Bid Accepted', `${o.cid} accepted by Pier Checker. QR Release Pass ready for dock hand-off.`);
       render();
     }
     function rejectPierBid(id) {
-      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return;
+      const list = ordRead(), o = list.find(x => x.id === id); if (!o) return; if (o.status === 'Cancelled') return toast('This order was cancelled by the Broker.', 1);
       o.status = 'Rejected'; o.updatedAt = new Date().toISOString(); ordWrite(list);
       noteFor(['checker', 'broker'], 'Pier Bid Rejected', `${o.cid} winning bid was rejected by Pier Checker.`);
       render();
@@ -3011,7 +3165,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       if (d) d.remove();
     }
     async function openOrderScanner(orderId, phase) {
-      const list = ordRead(), o = list.find(x => x.id === orderId); if (!o) return;
+      const list = ordRead(), o = list.find(x => x.id === orderId); if (!o) return; if (o.status === 'Cancelled') return toast('This order was cancelled by the Broker.', 1);
       await closeOrderScanner(); unlockAudio();
       ORD_SC_CTX = { orderId, phase };
       const title = phase === 'pier' ? 'Scan Broker QR Release Pass' : 'Scan Micro-Vendor Delivery QR';
@@ -3041,6 +3195,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     async function verifyOrderQr(orderId, rawText, phase) {
       const list = ordRead(), o = list.find(x => x.id === orderId);
       if (!o) { ORD_SC_BUSY = false; return toast('Order not found.', 1); }
+      if (o.status === 'Cancelled') { ORD_SC_BUSY = false; beep(0); return toast('This order was cancelled. Check-in is disabled.', 1); }
       const expected = orderQrPayload(o), legacy = `ORDQR1|${o.id}|${o.cid}|${orderQrToken(o)}`, passQr = (o.passId && o.passToken) ? `DEAL1|${o.passId}|${o.passToken}` : '', scanned = String(rawText || '').trim();
       if (!scanned || (scanned !== expected && scanned !== legacy && (!passQr || scanned !== passQr))) {
         ORD_SC_BUSY = false; beep(0); buzz([300]);
@@ -3107,20 +3262,31 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       const cur = ORD_STAR[o.id] || 5;
       return `<div class="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50"><div class="text-xs font-mono font-semibold text-slate-600 uppercase">Rate ${esc(targetLabel)}</div><div class="flex gap-1 my-2">${[1, 2, 3, 4, 5].map(n => `<button type="button" onclick="setOrderStar('${o.id}',${n})" class="text-xl px-1 ${n <= cur ? 'text-amber-500' : 'text-slate-300'}" aria-label="${n} stars">★</button>`).join('')}<span class="text-xs font-mono self-center ml-2">${cur}/5</span></div><textarea id="rat-txt-${o.id}" rows="2" class="inp text-sm" placeholder="Leave feedback on quality, speed, or delivery..."></textarea><button type="button" class="btn !w-full mt-2" onclick="submitOrderRating('${o.id}','${raterRole}')">Submit Rating & Feedback</button></div>`;
     }
+    //-> Function: cancelOrder(orderId)
+    //-> Marks a pending order Cancelled on this device at once. A broker's cancellation of a pier acquisition is also sent to Supabase (queued and retried when offline) so the Pier Checker sees it.
     async function cancelOrder(id) {
-      const list = ordRead(), o = list.find(x => x.id === id);
-      if (!o || (o.status !== 'Pending Approval' && o.status !== 'Pending Acceptance')) {
-        return toast('Cannot cancel order: it has already been approved or processed.', 1);
-      }
-      if (!await ask('Cancel this order?', `Cancel ${o.id} (${o.catchName}, ${o.kg} kg)? This cannot be undone.`, 'Cancel Order', 1)) return;
-      o.status = 'Cancelled';
-      o.updatedAt = new Date().toISOString();
-      ordWrite(list);
-      const targetRoles = o.kind === 'pier_acquisition' ? ['checker', 'broker'] : ['broker', 'vendor'];
-      noteFor(targetRoles, 'Order Cancelled', `${o.cid} (${o.id}) was cancelled by ${roleLabel(S.role)}.`);
-      render();
+      if (CANCELLING.has(id)) return;
+      const first = ordRead().find(x => x.id === id);
+      if (!first || (first.status !== 'Pending Approval' && first.status !== 'Pending Acceptance')) return toast('Cannot cancel order: it has already been approved or processed.', 1);
+      if (!await ask('Cancel this order?', `Cancel ${first.id} (${first.catchName}, ${first.kg} kg)? This cannot be undone.`, 'Cancel Order', 1)) return;
+      CANCELLING.add(id);
+      try {
+        const list = ordRead(), o = list.find(x => x.id === id); /* read again: it may have changed while the dialog was open */
+        if (!o || o.status === 'Cancelled') return;
+        if (o.status !== 'Pending Approval' && o.status !== 'Pending Acceptance') return toast('Cannot cancel order: it has already been approved or processed.', 1);
+        o.status = 'Cancelled'; o.cancelledBy = roleLabel(S.role); o.updatedAt = new Date().toISOString(); ordWrite(list);
+        if (o.kind === 'pier_acquisition' && S.role === 'broker') {
+          const q = outRead(); if (!q.some(x => x.order_id === o.id)) { q.push({ order_id: o.id, cid: o.cid, at: o.updatedAt }); outWrite(q) }
+          await flushOrderOutbox();
+          if (outRead().some(x => x.order_id === o.id)) toast('Order cancelled on this device. The Pier Checker will see it once you are back online.')
+        }
+        const targetRoles = o.kind === 'pier_acquisition' ? ['checker', 'broker'] : ['broker', 'vendor'];
+        noteFor(targetRoles, 'Order Cancelled', `${o.cid} (${o.id}) was cancelled by ${roleLabel(S.role)}.`);
+        render()
+      } finally { CANCELLING.delete(id) }
     }
     function openOrderQrModal(orderId) {
+      if (S.role === 'broker') return toast('Your hand-off QR code is shown on the Payment screen.', 1);
       const o = ordRead().find(x => x.id === orderId);
       if (!o) return toast('Order QR pass not found.', 1);
       closeOrderQrModal();
@@ -3134,7 +3300,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     function dlOrderReceipt(orderId) {
       const o = ordRead().find(x => x.id === orderId);
       if (!o) return toast('Order record not found.', 1);
-      const qrText = orderQrPayload(o);
+      const qrText = S.role === 'broker' ? '' : orderQrPayload(o);
       const S2 = 2, W = 640, H = qrText ? 650 : 440, cv = document.createElement('canvas');
       cv.width = W * S2; cv.height = H * S2;
       const x = cv.getContext('2d'); x.scale(S2, S2); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
@@ -3193,6 +3359,10 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
           let body = '', actions = '', recvLayout = '', chat = '', rate = '';
           if (isAcq) {
             body = `<div class="text-xs text-slate-600 mt-1">Pier Dock: <b>${esc(o.pierLocation)}</b> · Broker: <b>${esc(o.brokerIdent)}</b> · Total: <b class="font-mono">${fmt(o.total)}</b> · Escrow: <b>${esc(o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held'))}</b></div>`;
+            if (o.status === 'Cancelled') {
+              body += `<div class="mt-3 rounded-lg border border-red-300 bg-red-50 text-red-800 p-3 text-sm font-semibold" role="status">Order Cancelled. The Broker cancelled this order${o.updatedAt ? ' on ' + esc(new Date(o.updatedAt).toLocaleString()) : ''}. Inspection and check-in are disabled.</div>`;
+              if (r === 'checker') actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1" disabled aria-disabled="true">Accept Bid</button><button class="btn2 flex-1" disabled aria-disabled="true">Scan QR Release Pass</button></div>`;
+            }
             if (ORD_TAB === 'all' && o.status === 'Pending Acceptance') {
               if (r === 'checker') {
                 actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1" onclick="acceptPierBid('${o.id}')">✓ Accept Bid</button><button class="btn2 flex-1 !border-red-300 text-red-700" onclick="rejectPierBid('${o.id}')">✕ Reject Bid</button></div>`;
@@ -3203,7 +3373,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
             if ((ORD_TAB === 'receive' || ORD_TAB === 'all') && o.status === 'Accepted') {
               const contactHtml = r === 'checker' ? contactLinks(o.brokerPhone, 'Broker Contact') : contactLinks(o.checkerPhone, 'Pier Checker Contact');
               const leftCol = `<div class="space-y-1 text-xs text-slate-700"><div class="font-mono font-semibold text-slate-500 uppercase">Receiving Area · Passes & Ledges</div><div><b>Species:</b> ${esc(o.catchName)} · <b>Tubs:</b> ${tubsCount} · <b>Total Weight:</b> ${o.kg} kg</div><div><b>Agreed Price:</b> <span class="font-mono font-bold text-[#0B4A5D]">${fmt(o.total)}</span> · <b>Dock:</b> ${esc(o.pierLocation)}</div><div><b>Timestamp:</b> ${esc(tsStr)}</div>${contactHtml}</div>`;
-              const rightCol = `<div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52">${r === 'broker' ? `<button class="btn" onclick="openOrderQrModal('${o.id}')">🎟️ View QR Code</button>` : `<button class="btn" onclick="openOrderScanner('${o.id}','pier')">📷 Scan QR Release Pass</button>`}<button class="btn2" onclick="dlOrderReceipt('${o.id}')">📄 Download Receipt</button></div>`;
+              const rightCol = `<div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52">${r === 'broker' ? '<p class="text-xs text-slate-500">Your hand-off QR code is shown on the Payment screen.</p>' : `<button class="btn" onclick="openOrderScanner('${o.id}','pier')">📷 Scan QR Release Pass</button>`}<button class="btn2" onclick="dlOrderReceipt('${o.id}')">📄 Download Receipt</button></div>`;
               recvLayout = `<div class="mt-3 p-3 rounded-xl border border-teal-200 bg-teal-50/50 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">${leftCol}${rightCol}</div>`;
               if (ORD_TAB === 'receive') chat = renderChatBox(o, 'Pier Checker ↔ Broker Chat');
             }
@@ -3510,7 +3680,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       return 'You logged this lot'
     }
     const lotTag = c => c && soldFor(c) ? `<span class="badge ${c.closed ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'} h-fit">${c.closed ? 'Closed' : 'Sold out'}</span>` : '';
-    const histPasses = () => { if (S.passes.length) return S.passes; try { return JSON.parse(localStorage.getItem('deal-hist-' + S.uid)) || [] } catch (e) { return [] } };
+    const histPasses = () => { if (S.passes.length) return S.passes; try { return (JSON.parse(localStorage.getItem('deal-hist-' + S.uid)) || []).filter(passMine) } catch (e) { return [] } };
     const dtx = x => x ? new Date(x).toLocaleString() : '—', tsn = x => { const d = Date.parse(x); return isNaN(d) ? 0 : d };
     const lotLast = (c, ps) => Math.max(tsn(c.sold_out_at), tsn(lsMap(SEENK())[c.id]), tsn(c.settled_at), tsn(c.created_at), ...ps.filter(p => p.cid === c.id).map(p => Math.max(tsn(p.created_at), tsn(p.scanned_at))));
     const HK = { auction: ['🏆 Auction closed', 'bg-teal-100 text-teal-800'], claim: ['⚖️ Claimed & paid (escrow)', 'bg-yellow-100 text-yellow-800'], delivered: ['✓ Delivered / pickup verified', 'bg-emerald-100 text-emerald-800'], sold: ['📦 Sold out', 'bg-sky-100 text-sky-800'], logged: ['📋 Logged at the pier', 'bg-teal-100 text-teal-800'] };
@@ -3602,6 +3772,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     RULES.push([/^Pay amount · (.+)$/, 'Bayaran ang halaga · $1', 'Bayaran ang amount · $1']);
     /* unified orders system: authentic Tagalog / Taglish wet-market & consignation terms */
     [['Orders', 'Mga Order', 'Orders'], ['All Orders', 'Lahat ng Order', 'All Orders'], ['To Receive', 'Tatanggapin', 'To Receive'], ['To Rate', 'Bibigyan ng Rating', 'To Rate'], ['Pending Acceptance', 'Naghihintay ng Pagtanggap', 'Pending Acceptance'], ['Pending Approval', 'Naghihintay ng Pag-apruba', 'Pending Approval'], ['Accepted', 'Tinanggap', 'Accepted'], ['In Transit', 'Nasa Biyahe', 'In Transit'], ['Delivered', 'Naihatid na', 'Delivered'], ['Rejected', 'Tinanggihan', 'Rejected'], ['Direct Delivery by Broker Transport', 'Direktang Hatid ng Sasakyan ng Consignee', 'Direct Delivery ng Broker Transport'], ['Self-Pickup at the Pier Dock', 'Sariling Kuha sa Bagsakan / Pier', 'Self-Pickup sa Pier Dock'], ['Show password', 'Ipakita ang password', 'Ipakita ang password'], ['Hide password', 'Itago ang password', 'Itago ang password']].forEach(a => { if (!DT[a[0]]) LT(a[0], a[1], a[2]) });
+    [['Wrong ID or password', 'Maling ID o password', 'Mali ang ID o password'], ['Order Cancelled', 'Kinansela ang Order', 'Cancelled ang Order']].forEach(a => { if (!DT[a[0]]) LT(a[0], a[1], a[2]) });
     // ---> sign-in overlay and application rendering <---
     let signKey = '', signOpener = null;
     //-> Function: paintSign()
@@ -3628,7 +3799,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
       if (!S.user) { const y0 = scrollY; a.innerHTML = landing(); trDom(a); scrollTo(0, y0); revealInit(); paintBusy(); if (!S.go && (!document.activeElement || document.activeElement === document.body)) { const c = $('#cta'); c && c.focus({ preventScroll: true }) } return }
       a.innerHTML = head() + nav() + `<main class="max-w-6xl mx-auto p-4 pb-28">${view()}</main>` + bottom() + idModal() + evModal() + portionModal() + payModal() + bpModal() + brModal() + passModal() + sbModal() + ndModal() + tourUI(); if (S.tab === 'taripa') calc(); iconify(a); trDom(a); paintBusy(); evChk(); navFix(); requestAnimationFrame(tourPos); if (S.tour) setTimeout(tourPos, 320)
     }
-    addEventListener('online', () => { render(); if (S.user && S.queue.length) toast('Back online. Open Offline Sync to send saved claims.') }); addEventListener('offline', render);
+    addEventListener('online', () => { if (S.offlineSession) resumeOnline(); else if (S.uid) flushOrderOutbox().then(() => load(1)); render(); if (S.user && S.queue.length) toast('Back online. Open Offline Sync to send saved claims.') }); addEventListener('offline', render);
     (async () => { const C = window.DEAL_CONFIG || {}; if (C.url && C.key && window.supabase) { sb = supabase.createClient(new URL(C.url.trim()).origin, C.key.trim(), { auth: { persistSession: true, autoRefreshToken: true } }); sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') clearStaleAuthTokens() }); try { await enter() } catch (e) { clearStaleAuthTokens() } } render() })();
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('/sw.js').catch(() => { });
   </script>
