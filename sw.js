@@ -12,12 +12,12 @@
 //-> 3. Fetch Phase: Implements stale-while-revalidate / network-first caching for local assets and CDN dependencies.
 //-> =========================================================================
 
-const C = 'deal-v3';
+const C = 'deal-v4';
 
 //-> Event Handler: Service Worker Install
 //-> Purpose: Pre-caches core application shell assets into CacheStorage for instant offline startup.
 //-> Parameters: e (ExtendableEvent) - Service worker install event.
-//-> State Updates: Opens CacheStorage container named 'deal-v3'.
+//-> State Updates: Opens CacheStorage container named 'deal-v4'.
 //-> Storage / API Calls: Uses caches.open(C) and cache.addAll(['/', '/index.html']).
 //-> Dynamic UI Updates: Invokes self.skipWaiting() to activate service worker immediately.
 self.addEventListener('install', e => {
@@ -26,17 +26,17 @@ self.addEventListener('install', e => {
 });
 
 //-> Event Handler: Service Worker Activate
-//-> Purpose: Asserts immediate client control across all open browser windows and tabs.
+//-> Purpose: Deletes old cache versions (so stale pages and data are dropped) and asserts immediate client control across all open browser windows and tabs.
 //-> Parameters: e (ExtendableEvent) - Service worker activation event.
 //-> State Updates: None.
 //-> Storage / API Calls: Calls self.clients.claim().
 //-> Dynamic UI Updates: Ensures all running tabs are managed by this service worker version.
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== C).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 
 //-> Event Handler: Service Worker Fetch
 //-> Purpose: Intercepts GET requests, attempts network retrieval with runtime cache updates, and provides offline fallback to cached index.html.
 //-> Parameters: e (FetchEvent) - Service worker network fetch event.
-//-> State Updates: Clones and stores successful responses into 'deal-v3' cache.
+//-> State Updates: Clones and stores successful responses into 'deal-v4' cache.
 //-> Storage / API Calls: Executes window.fetch(e.request) and caches.match(e.request).
 //-> Dynamic UI Updates: Transparently returns cached response or index.html shell when disconnected from internet.
 self.addEventListener('fetch', e => {

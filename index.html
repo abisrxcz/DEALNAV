@@ -1633,9 +1633,9 @@
     try { const l = accGet()._last; if (l && LBL0.includes(l)) LR = l } catch (e) { }
     //-> Function: LS(key, fallback)
     //-> Reads a JSON value from localStorage and returns the fallback when the item is missing or invalid.
-    /* One-time local clean-up: when DATA_EPOCH changes, every device drops its saved catches, queue, payment and history caches (accounts and display settings are kept). */
-    const DATA_EPOCH = 'reset-2026-11-a';
-    try { if (localStorage.getItem('deal-epoch') !== DATA_EPOCH) { Object.keys(localStorage).filter(k => /^(deal-cache|deal-q|deal-hist-|deal-pay-|deal-logged-|deal-soldseen-)/.test(k)).forEach(k => localStorage.removeItem(k)); localStorage.setItem('deal-epoch', DATA_EPOCH) } } catch (e) { }
+    /* One-time local clean-up: when DATA_EPOCH changes, every device drops its saved catches, queue, payment, order, notification and history caches (accounts and display settings are kept). Run supabase_clear_records.sql to clear the same records in the database. */
+    const DATA_EPOCH = 'reset-2026-11-b';
+    try { if (localStorage.getItem('deal-epoch') !== DATA_EPOCH) { Object.keys(localStorage).filter(k => /^(deal-cache|deal-q|deal-hist-|deal-pay-|deal-bidpay-|deal-bp-|deal-logged-|deal-soldseen-|deal-orders-v1|deal-ord-cleared|deal-notif-v1)/.test(k)).forEach(k => localStorage.removeItem(k)); localStorage.setItem('deal-ord-cleared', String(Date.now())); localStorage.setItem('deal-epoch', DATA_EPOCH) } } catch (e) { }
     const LS = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch (e) { return d } };
     let S = { mute: localStorage.getItem('deal-mute') === '1', notes: [], unread: 0, uid: null, bids: [], live: 'off', bidIn: {}, lastLoad: 0, user: null, role: null, tab: 'floor', lang: 'EN', catches: LS('deal-cache', []), passes: [], queue: LS('deal-q', []), checks: [], sel: null, offline: false, dark: false };
     //-> Function: save()
@@ -1829,7 +1829,7 @@
       S.checks = (k.data || []).map(x => ({ id: x.cid, name: esc(x.name), res: x.res, by: esc(x.by_name), t: new Date(x.created_at).toLocaleString(), iso: x.created_at, rid: Number(x.id) }));
       if (!p.error && S.catches.length === 0 && S.passes.length === 0) {
         if (ordRead().length) ordWrite([]);
-        try { Object.keys(localStorage).filter(k => /^(deal-cache|deal-hist-|deal-pay-|deal-bp-|deal-logged-|deal-soldseen-)/.test(k)).forEach(k => localStorage.removeItem(k)) } catch (e) { }
+        try { Object.keys(localStorage).filter(k => /^(deal-cache|deal-hist-|deal-pay-|deal-bidpay-|deal-bp-|deal-logged-|deal-soldseen-)/.test(k)).forEach(k => localStorage.removeItem(k)) } catch (e) { }
       }
       if (S.role === 'checker') { const m = lsMap(LOGK()); let ch = 0; S.checks.forEach(k => { if (k.by === S.user && (!m[k.id] || m[k.id].res !== k.res || !m[k.id].t)) { m[k.id] = { t: k.iso, res: k.res, name: k.name }; ch = 1 } }); if (ch) lsSet(LOGK(), m) }
       if (S.loaded) for (const x of S.catches) {
