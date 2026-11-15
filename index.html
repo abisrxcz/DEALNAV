@@ -1909,7 +1909,7 @@
       if (typeof syncPierAcquisitions === 'function') syncPierAcquisitions(S.catches, S.loaded);
       applyOrderStatus(S.loaded);
       if (typeof syncVendorOrdersFromPasses === 'function') syncVendorOrdersFromPasses(S.passes);
-      S.loaded = 1; S.upd = new Date().toLocaleTimeString(); S.lastLoad = Date.now();
+      S.loaded = 1; try { aiWarm() } catch (e) { } S.upd = new Date().toLocaleTimeString(); S.lastLoad = Date.now();
       if (!find(S.sel)) S.sel = S.catches[0] && S.catches[0].id;
       if (!q || (!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && !(S.role === 'checker' && S.tab === 'intake'))) render();
       else if (S.tab === 'floor' && document.activeElement && document.activeElement.id === 'fq') { const g = $('#fgrid'); if (g) { g.innerHTML = floorGrid(); iconify(g); trDom(g) } }
@@ -2454,7 +2454,7 @@ ${F('name', 'Common name', 'Galunggong (Round Scad)')}
 <div class="grid grid-cols-2 gap-3">${F('kg', 'Tub weight (kg)', 40, 'number')}${F('tubs', 'Available tubs', 15, 'number')}${F('base', 'Wholesale base (₱/kg)', 185, 'number')}${F('start', 'Starting bid (₱/kg)', 175, 'number')}</div>
 ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V San Miguel Navotas')}
 <div class="mt-5 border-t pt-4"><h3 class="font-mono font-bold">Suri-Isda Quality Guard · AI check</h3>
-<p class="text-xs text-slate-500 mt-1">Add three clear photos of the tub. When you submit, the AI reviews them, runs the checklist below, gives the freshness score and decides whether the lot passes or is flagged.</p>
+${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of the tub. When you submit, the AI reviews them, runs the checklist below, gives the freshness score and decides whether the lot passes or is flagged.</p>
 <ul class="text-xs text-slate-600 mt-2 grid gap-1 sm:grid-cols-2">${['Bottom core sample', 'Gill & eye freshness', 'Weight and species match', 'Multi-angle proof reviewed'].map(x => `<li>🔍 ${x}</li>`).join('')}</ul>
 <div class="grid grid-cols-3 gap-2 mt-3 text-xs text-center">${['Front', 'Middle', 'Bottom'].map((x, i) => `<label class="relative border-2 border-dashed rounded-lg h-28 flex items-center justify-center cursor-pointer overflow-hidden"><span>${x} +</span><img id="evp${i}" class="hidden absolute inset-0 w-full h-full object-cover" alt=""><span id="evc${i}" class="hidden absolute bottom-1 inset-x-1 bg-emerald-600 text-white text-[0.6875rem] font-bold rounded px-1 py-0.5">✓ Photo Captured</span><input id="ev${i}" type="file" accept="image/*" class="hidden" onchange="prev(this,'evp${i}');fishPick(this,${i})"></label>`).join('')}</div>
 <p class="text-xs text-slate-500 mt-2">Front = top layer of the tub. Only photos of fish are accepted; anything else is rejected. The front photo is also shown on the lot card.</p></div>
@@ -2486,11 +2486,20 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
     };
     let AIP = null; const AIC = new WeakMap();
     const aiNorm = a => { let s = 0; for (const x of a) s += x * x; s = Math.sqrt(s) || 1; return a.map(x => x / s) };
+    /* ---- AI warm-up: progress readout + early start ---- */
+    let AI_ST = '', AI_FILES = {}, AI_TRIED = 0;
+    const aiStatHtml = () => AI_ST ? `<p id="aiStat" role="status" class="text-xs font-mono mt-2 ${AI_ST.startsWith('✓') ? 'text-emerald-700' : AI_ST.startsWith('⚠') ? 'text-red-700' : 'text-teal-700'}">${AI_ST}</p>` : '<p id="aiStat" role="status" class="text-xs font-mono mt-2"></p>';
+    function aiSet(m) { AI_ST = m === 'ready' ? '✓ AI inspector ready' : m === 'error' ? '⚠ AI inspector could not load. Check your connection; it will retry when you submit.' : m; const e = document.getElementById('aiStat'); if (e) { e.outerHTML = aiStatHtml() } }
+    function aiProg(x) { if (!x || !x.file) return; if (x.status === 'progress') AI_FILES[x.file] = [x.loaded || 0, x.total || 0]; else if (x.status === 'done') { const t = AI_FILES[x.file]; if (t) AI_FILES[x.file] = [t[1], t[1]] } else return;
+      let l = 0, t = 0; for (const k in AI_FILES) { l += AI_FILES[k][0]; t += AI_FILES[k][1] } if (t) aiSet(`⏳ Loading AI inspector… ${Math.min(99, Math.round(100 * l / t))}% (${Math.round(l / 1048576)} of ${Math.round(t / 1048576)} MB, first time only)`) }
+    /* start loading as soon as a Pier Checker is signed in, so the check is fast by the time they submit */
+    function aiWarm() { if (AI_TRIED || AIP || S.role !== 'checker' || !navigator.onLine) return; AI_TRIED = 1; aiSet('⏳ Preparing AI inspector…'); aiLoad().catch(() => { }) }
     function aiLoad() {
       return AIP || (AIP = (async () => {
         try {
           const T = await import(AI_LIB); T.env.allowLocalModels = false;
-          const [tok, tm, proc, vm] = await Promise.all([T.AutoTokenizer.from_pretrained(AI_MODEL), T.CLIPTextModelWithProjection.from_pretrained(AI_MODEL), T.AutoProcessor.from_pretrained(AI_MODEL), T.CLIPVisionModelWithProjection.from_pretrained(AI_MODEL)]);
+          const [tok, tm, proc, vm] = await Promise.all([T.AutoTokenizer.from_pretrained(AI_MODEL, { progress_callback: aiProg }), T.CLIPTextModelWithProjection.from_pretrained(AI_MODEL, { progress_callback: aiProg }), T.AutoProcessor.from_pretrained(AI_MODEL, { progress_callback: aiProg }), T.CLIPVisionModelWithProjection.from_pretrained(AI_MODEL, { progress_callback: aiProg })]);
+          aiSet('ready');
           const names = [], idx = {}; for (const g of Object.keys(AI_G)) { const lo = names.length; names.push(...AI_G[g][0], ...AI_G[g][1]); idx[g] = [lo, lo + AI_G[g][0].length, names.length] }
           const { text_embeds } = await tm(tok(names.map(x => 'a photo of ' + x), { padding: true, truncation: true }));
           const d = text_embeds.data, k = d.length / names.length, te = names.map((_, i) => aiNorm(Array.from(d.slice(i * k, (i + 1) * k))));
@@ -2501,7 +2510,7 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
               const m = Math.max(...l), e = l.map(x => Math.exp(x - m)), t = e.reduce((p, q) => p + q, 0); return e.slice(0, mid - lo).reduce((p, q) => p + q, 0) / t
             }
           }
-        } catch (e) { console.error(e); AIP = null; throw new Error('The on-device AI could not load. Check your connection and try again (the first use downloads about 150 MB).') }
+        } catch (e) { console.error(e); AIP = null; aiSet('error'); throw new Error('The on-device AI could not load. Check your connection and try again (the first use downloads about 150 MB).') }
       })())
     }
     //-> Function: aiRead(file, url): scores one photo (fish / condition / eyes+gills) and caches the result for that file.
