@@ -12,7 +12,7 @@
 //-> 3. Fetch Phase: Implements stale-while-revalidate / network-first caching for local assets and CDN dependencies.
 //-> =========================================================================
 
-const C = 'deal-v4';
+const C = 'deal-v5';
 
 //-> Event Handler: Service Worker Install
 //-> Purpose: Pre-caches core application shell assets into CacheStorage for instant offline startup.
