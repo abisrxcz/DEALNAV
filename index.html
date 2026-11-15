@@ -1834,7 +1834,7 @@
     async function enter(want) {
       let user = null;
       try {
-        const { data, error } = await sb.auth.getUser();
+        let { data, error } = await sb.auth.getSession(); if (!error && data && data.session) data = { user: data.session.user }; else ({ data, error } = await sb.auth.getUser());
         if (error) {
           if (/refresh token|invalid jwt|session/i.test(error.message || '')) {
             clearStaleAuthTokens();
@@ -1852,8 +1852,8 @@
       const { data: p } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (!p || !p.approved || (want && p.role !== want)) { await sb.auth.signOut(); toast(!p ? 'No profile found for this account.' : !p.approved ? 'Account is awaiting admin approval.' : 'This account is not registered for this portal.', 1); return false }
       if (want && S.rem !== false) accSave(p.role, p.ident); if (want) S.dark = false; S.user = p.ident; S.name = p.full_name || p.name || p.ident; S.avatar = p.avatar_url || p.avatar || null; S.uid = user.id; S.role = p.role; S.tutDue = tutDueFor(user.id); S.station = p.station || 'Pier 1-3'; S.tab = TABS[p.role][0][0]; S.offlineSession = false; userScope();
-      try { await devSync(!!want); await prefsPull(); S.tutDue = tutDueFor(user.id) } catch (e) { }
-      await load(1); if (ch) { try { sb.removeChannel(ch) } catch (e) { } } ch = sb.channel('deal').on('postgres_changes', { event: '*', schema: 'public' }, () => load(1)).subscribe(liveStatus); startAuctionLoops(); bump(); render(); return true
+      const _pre = (async () => { try { await devSync(!!want); await prefsPull(); S.tutDue = tutDueFor(user.id) } catch (e) { } })();
+      await Promise.all([_pre, load(1)]); if (ch) { try { sb.removeChannel(ch) } catch (e) { } } ch = sb.channel('deal').on('postgres_changes', { event: '*', schema: 'public' }, () => { clearTimeout(window.__lt); window.__lt = setTimeout(() => load(1), 600) }).subscribe(liveStatus); startAuctionLoops(); bump(); render(); return true
     }
     async function logout() { S.lang = 'EN'; S.dark = false; closeScanner(); S.pm = null; S.pay = null; S.pass = null; S.bp = null; S.br = null; try { await sb.auth.signOut({ scope: 'local' }); if (ch) sb.removeChannel(ch) } catch (e) { } clearStaleAuthTokens(); stopAuctionLoops(); SQ = ''; SF = 'all'; S.queue = []; S.ordStatus = {}; S.offlineSession = false; S.offEmail = null; OFFPW = null; S.name = null; S.user = null; S.uid = null; S.live = 'off'; S.bids = []; S.catches = []; S.passes = []; S.checks = []; render() }
     addEventListener('storage', async e => {
@@ -1872,11 +1872,11 @@
     //-> Refreshes the current user's catches and role-specific records from Supabase, then updates app state for rendering.
     async function load(q) {
       if (S.offlineSession) { if (online()) await resumeOnline(); return }
-      await flushOrderOutbox();
+      const _so = loadSrvOrders(); await flushOrderOutbox();
       /* a countdown may have run out while nobody was looking: let the database close it first */
       if (S.catches.some(x => x.auction_ends && !x.settled_at && Date.parse(x.auction_ends) <= Date.now())) await sb.rpc('settle_due_auctions');
       const [c, p, k, b, os] = await Promise.all([sb.from('catches').select('*').order('id'), sb.from('passes').select('*').order('created_at', { ascending: false }), sb.from('checks').select('id,cid,name,res,by_name,created_at').order('created_at', { ascending: false }).limit(500),
-      S.role === 'broker' ? sb.from('bids').select('id,cid,broker_id,broker_ident,amount,created_at').order('created_at', { ascending: false }).limit(300) : Promise.resolve({ data: [] }), sb.from('order_status').select('order_id,cid,status,updated_at').then(r => r, () => ({ data: null, error: true }))]);
+      S.role === 'broker' ? sb.from('bids').select('id,cid,broker_id,broker_ident,amount,created_at').order('created_at', { ascending: false }).limit(300) : Promise.resolve({ data: [] }), Promise.resolve({ data: null, error: true })]);
       if (c.error) return toast('Could not load data. Showing the last saved copy.', 1);
       const old = Object.fromEntries(S.catches.map(x => [x.id, x]));
       S.catches = c.data.map(x => { ['name', 'sci', 'src', 'bid_by_ident', 'winner_ident'].forEach(f => x[f] = esc(x[f])); x.bid = +x.bid; x.bid_count = +x.bid_count || 0; if (!/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(x.photo || '')) x.photo = null; return normLot(x) });
@@ -1905,11 +1905,11 @@
         }
         if (!o.verified && x.verified) noteFor(['checker', 'broker'], 'Inspection update', `${x.id} passed Suri-Isda.`); if (o.verified && !x.verified) noteFor(['checker', 'broker'], 'Inspection update', `${x.id} flagged for review.`)
       }
-      await loadSrvOrders(); if (os && !os.error) S.ordStatus = Object.fromEntries((os.data || []).map(r => [r.order_id, r]));
+      await _so; if (os && !os.error) S.ordStatus = Object.fromEntries((os.data || []).map(r => [r.order_id, r]));
       if (typeof syncPierAcquisitions === 'function') syncPierAcquisitions(S.catches, S.loaded);
       applyOrderStatus(S.loaded);
       if (typeof syncVendorOrdersFromPasses === 'function') syncVendorOrdersFromPasses(S.passes);
-      S.loaded = 1; try { aiWarm() } catch (e) { } S.upd = new Date().toLocaleTimeString(); S.lastLoad = Date.now();
+      S.loaded = 1; try { setTimeout(aiWarm, 8000) } catch (e) { } S.upd = new Date().toLocaleTimeString(); S.lastLoad = Date.now();
       if (!find(S.sel)) S.sel = S.catches[0] && S.catches[0].id;
       if (!q || (!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && !(S.role === 'checker' && S.tab === 'intake'))) render();
       else if (S.tab === 'floor' && document.activeElement && document.activeElement.id === 'fq') { const g = $('#fgrid'); if (g) { g.innerHTML = floorGrid(); iconify(g); trDom(g) } }
@@ -2457,14 +2457,14 @@ ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V
 ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of the tub. When you submit, the AI reviews them, runs the checklist below, gives the freshness score and decides whether the lot passes or is flagged.</p>
 <ul class="text-xs text-slate-600 mt-2 grid gap-1 sm:grid-cols-2">${['Bottom core sample', 'Gill & eye freshness', 'Weight and species match', 'Multi-angle proof reviewed'].map(x => `<li>🔍 ${x}</li>`).join('')}</ul>
 <div class="grid grid-cols-3 gap-2 mt-3 text-xs text-center">${['Front', 'Middle', 'Bottom'].map((x, i) => `<label class="relative border-2 border-dashed rounded-lg h-28 flex items-center justify-center cursor-pointer overflow-hidden"><span>${x} +</span><img id="evp${i}" class="hidden absolute inset-0 w-full h-full object-cover" alt=""><span id="evc${i}" class="hidden absolute bottom-1 inset-x-1 bg-emerald-600 text-white text-[0.6875rem] font-bold rounded px-1 py-0.5">✓ Photo Captured</span><input id="ev${i}" type="file" accept="image/*" class="hidden" onchange="prev(this,'evp${i}');fishPick(this,${i})"></label>`).join('')}</div>
-<p class="text-xs text-slate-500 mt-2">Front = top layer of the tub. Only photos of fish are accepted; anything else is rejected. The front photo is also shown on the lot card.</p></div>
+<p class="text-xs text-slate-500 mt-2">Front = top layer of the tub. ${AI_DEMO ? 'Demo mode: the pass/flag result is randomly generated.' : 'Only photos of fish are accepted; anything else is rejected.'} The front photo is also shown on the lot card.</p></div>
 <button class="btn !w-full mt-4" data-k="log">+ Log Incoming Catch</button></form>`}
     const shrink = (f, m = 800, q = .75) => new Promise(r => { if (!f) return r(null); const i = new Image, u = URL.createObjectURL(f); i.onload = () => { const k = Math.min(1, m / Math.max(i.width, i.height)), c = document.createElement('canvas'); c.width = Math.round(i.width * k); c.height = Math.round(i.height * k); c.getContext('2d').drawImage(i, 0, 0, c.width, c.height); URL.revokeObjectURL(u); r(c.toDataURL('image/jpeg', q)) }; i.onerror = () => r('ERR'); i.src = u });
     function prev(inp, id) { const f = inp.files[0], im = $('#' + id); if (!f) { im.classList.add('hidden'); return } im.onerror = () => { toast('This photo could not be previewed. Use a JPG or PNG image.', 1); im.classList.add('hidden') }; im.src = URL.createObjectURL(f); im.classList.remove('hidden') }
     async function viewEv(id) { const { data, error } = await sb.from('checks').select('*').eq('id', id).maybeSingle(); if (error || !data) return toast('Could not load the evidence.', 1); S.ev = data; render() }
     async function viewInsp(cid) { const { data, error } = await sb.rpc('get_inspection', { p_cid: cid }); if (error) return toast(error.message, 1); if (!data) return toast('No inspection record found for this lot.', 1); S.ev = data; render() }
     const AIK = [['bottom_core', 'Bottom core sample'], ['gill_eye', 'Gill & eye freshness'], ['weight_species', 'Weight and species match'], ['multi_angle', 'Multi-angle proof reviewed']];
-    const aiBlock = r => { if (!r || !r.checks) return ''; return `<div class="mt-3 border rounded-lg p-3"><div class="font-mono text-xs text-slate-500 mb-1">AI SURI-ISDA CHECKLIST</div>${AIK.map(([k, l]) => { const c = r.checks[k] || {}; return `<div class="flex gap-2 text-sm py-1 border-b"><span class="${c.pass ? 'text-teal-700' : 'text-red-700'} font-bold">${c.pass ? '✓' : '✗'}</span><span><b>${l}</b>${c.note ? `<br><span class="text-xs text-slate-500">${esc(c.note)}</span>` : ''}</span></div>` }).join('')}${r.summary ? `<p class="text-xs mt-2">${esc(r.summary)}</p>` : ''}</div>` };
+    const aiBlock = r => { if (!r || !r.checks) return ''; return `<div class="mt-3 border rounded-lg p-3"><div class="font-mono text-xs text-slate-500 mb-1">AI SURI-ISDA CHECKLIST${AI_DEMO ? ' · DEMO ONLY' : ''}</div>${AIK.map(([k, l]) => { const c = r.checks[k] || {}; return `<div class="flex gap-2 text-sm py-1 border-b"><span class="${c.pass ? 'text-teal-700' : 'text-red-700'} font-bold">${c.pass ? '✓' : '✗'}</span><span><b>${l}</b>${c.note ? `<br><span class="text-xs text-slate-500">${esc(c.note)}</span>` : ''}</span></div>` }).join('')}${r.summary ? `<p class="text-xs mt-2">${esc(r.summary)}</p>` : ''}</div>` };
     const evModal = () => {
       const d = S.ev; if (!d) return ''; const ok = u => /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(u || '');
       const ph = [d.photo_top, d.photo_mid, d.photo_bot].map((u, i) => ok(u) ? `<div><img src="${u}" class="rounded-lg w-full h-28 object-cover" alt=""><div class="text-xs text-center mt-1">${['Top', 'Middle', 'Bottom'][i]}</div></div>` : '').join('');
@@ -2476,6 +2476,8 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
     // ---> on-device AI Suri-Isda Guard (no API key) <---
     //-> Runs a small CLIP vision-language model inside the browser through transformers.js. The model files are downloaded once from the public CDN / Hugging Face and then cached by the browser.
     //-> Every photo must first be recognised as FISH (crustaceans, shellfish, people, objects etc. are rejected); only then are the checklist and freshness score estimated.
+    /* DEMO SWITCH: true = random demo inspection (no 150 MB download, no real quality check). Set to false to use the real on-device AI model. */
+    const AI_DEMO = true;
     const AI_LIB = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2', AI_MODEL = 'Xenova/clip-vit-base-patch32', FISH_MIN = .6, AI_PASS = 6, FL = ['front', 'middle', 'bottom'];
     const AI_G = {
       fish: [['a fish', 'a whole fish', 'a pile of fresh fish', 'fish on ice in a tub', 'a fish at a fish market', 'a close-up of fish scales', 'a fish head with eye and gills'],
@@ -2488,12 +2490,12 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
     const aiNorm = a => { let s = 0; for (const x of a) s += x * x; s = Math.sqrt(s) || 1; return a.map(x => x / s) };
     /* ---- AI warm-up: progress readout + early start ---- */
     let AI_ST = '', AI_FILES = {}, AI_TRIED = 0;
-    const aiStatHtml = () => AI_ST ? `<p id="aiStat" role="status" class="text-xs font-mono mt-2 ${AI_ST.startsWith('✓') ? 'text-emerald-700' : AI_ST.startsWith('⚠') ? 'text-red-700' : 'text-teal-700'}">${AI_ST}</p>` : '<p id="aiStat" role="status" class="text-xs font-mono mt-2"></p>';
+    const aiStatHtml = () => AI_DEMO ? '<p id="aiStat" role="status" class="text-xs font-semibold mt-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 p-2">🧪 DEMO ONLY: this inspector gives randomly generated results for demonstration. It does not check real fish quality.</p>' : AI_ST ? `<p id="aiStat" role="status" class="text-xs font-mono mt-2 ${AI_ST.startsWith('✓') ? 'text-emerald-700' : AI_ST.startsWith('⚠') ? 'text-red-700' : 'text-teal-700'}">${AI_ST}</p>` : '<p id="aiStat" role="status" class="text-xs font-mono mt-2"></p>';
     function aiSet(m) { AI_ST = m === 'ready' ? '✓ AI inspector ready' : m === 'error' ? '⚠ AI inspector could not load. Check your connection; it will retry when you submit.' : m; const e = document.getElementById('aiStat'); if (e) { e.outerHTML = aiStatHtml() } }
     function aiProg(x) { if (!x || !x.file) return; if (x.status === 'progress') AI_FILES[x.file] = [x.loaded || 0, x.total || 0]; else if (x.status === 'done') { const t = AI_FILES[x.file]; if (t) AI_FILES[x.file] = [t[1], t[1]] } else return;
       let l = 0, t = 0; for (const k in AI_FILES) { l += AI_FILES[k][0]; t += AI_FILES[k][1] } if (t) aiSet(`⏳ Loading AI inspector… ${Math.min(99, Math.round(100 * l / t))}% (${Math.round(l / 1048576)} of ${Math.round(t / 1048576)} MB, first time only)`) }
     /* start loading as soon as a Pier Checker is signed in, so the check is fast by the time they submit */
-    function aiWarm() { if (AI_TRIED || AIP || S.role !== 'checker' || !navigator.onLine) return; AI_TRIED = 1; aiSet('⏳ Preparing AI inspector…'); aiLoad().catch(() => { }) }
+    function aiWarm() { if (AI_DEMO || AI_TRIED || AIP || S.role !== 'checker' || !navigator.onLine || (navigator.connection && (navigator.connection.saveData || /^(slow-2g|2g)$/.test(navigator.connection.effectiveType)))) return; AI_TRIED = 1; aiSet('⏳ Preparing AI inspector…'); aiLoad().catch(() => { }) }
     function aiLoad() {
       return AIP || (AIP = (async () => {
         try {
@@ -2515,7 +2517,9 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
     }
     //-> Function: aiRead(file, url): scores one photo (fish / condition / eyes+gills) and caches the result for that file.
     async function aiRead(file, url) {
-      let c = AIC.get(file); if (c) return c; if (!AIP) toast('Loading the on-device AI… the first time downloads about 150 MB.');
+      let c = AIC.get(file); if (c) return c;
+      if (AI_DEMO) { await new Promise(r => setTimeout(r, 400 + Math.random() * 500)); c = { fish: .95, cond: .38 + Math.random() * .57, eye: .38 + Math.random() * .57 }; AIC.set(file, c); return c }
+      if (!AIP) toast('Loading the on-device AI… the first time downloads about 150 MB.');
       const E = await aiLoad(), ie = await E.img(url); c = { fish: E.sum(ie, 'fish'), cond: E.sum(ie, 'cond'), eye: E.sum(ie, 'eye') }; AIC.set(file, c); return c
     }
     //-> Function: fishPick(input, i): as soon as a photo is chosen, rejects it if it is not fish and clears the slot.
@@ -2543,7 +2547,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
         multi_angle: dup ? { pass: false, note: 'Two photos look like duplicates. Show the front, middle and bottom layers separately.' } : dark ? { pass: false, note: 'A photo is too dark or too bright to inspect. Retake it in better light.' } : { pass: true, note: 'Three distinct, usable photos of fish were provided.' }
       };
       const fails = Object.keys(checks).filter(k => !checks[k].pass), passed = !fails.length && sc >= AI_PASS;
-      return { checks, freshness_score: sc, passed, summary: `On-device AI estimate: freshness ${sc}/10. ` + (passed ? 'All checks passed.' : fails.length ? 'Flagged: ' + fails.map(k => AIK.find(x => x[0] === k)[1]).join(', ') + '.' : `Score is below the pass mark of ${AI_PASS}.`) }
+      return { demo: AI_DEMO, checks, freshness_score: sc, passed, summary: (AI_DEMO ? 'DEMO ONLY (random result, not a real inspection): ' : '') + `On-device AI estimate: freshness ${sc}/10. ` + (passed ? 'All checks passed.' : fails.length ? 'Flagged: ' + fails.map(k => AIK.find(x => x[0] === k)[1]).join(', ') + '.' : `Score is below the pass mark of ${AI_PASS}.`) }
     }
     //-> Function: logCatch(form)
     //-> Validates the intake fields and three photos, lets the on-device AI run the checklist and score the freshness, saves the lot (verified or flagged) and shows the AI report.
