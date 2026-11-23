@@ -12,7 +12,13 @@
 //-> 3. Fetch Phase: Implements stale-while-revalidate / network-first caching for local assets and CDN dependencies.
 //-> =========================================================================
 
-const C = 'deal-v5';
+const C = 'deal-v6';
+const OPTIONAL_ASSETS = [
+  'https://cdn.tailwindcss.com/3.4.17',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js',
+  'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js',
+  'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js'
+];
 
 //-> Event Handler: Service Worker Install
 //-> Purpose: Pre-caches core application shell assets into CacheStorage for instant offline startup.
@@ -21,7 +27,10 @@ const C = 'deal-v5';
 //-> Storage / API Calls: Uses caches.open(C) and cache.addAll(['/', '/index.html']).
 //-> Dynamic UI Updates: Invokes self.skipWaiting() to activate service worker immediately.
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(C).then(c => c.addAll(['/', '/index.html'])));
+  e.waitUntil(caches.open(C).then(async c => {
+    await c.addAll(['/', '/index.html', '/config.js']);
+    await Promise.allSettled(OPTIONAL_ASSETS.map(url => c.add(new Request(url, { mode: 'no-cors' }))));
+  }));
   self.skipWaiting();
 });
 
@@ -41,12 +50,12 @@ self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Prom
 //-> Dynamic UI Updates: Transparently returns cached response or index.html shell when disconnected from internet.
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url), same = u.origin === location.origin;
-  if (e.request.method !== 'GET' || (!same && u.hostname !== 'cdn.jsdelivr.net')) return;
+  if (e.request.method !== 'GET' || (!same && !['cdn.jsdelivr.net', 'cdn.tailwindcss.com'].includes(u.hostname))) return;
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(e.request).then(async r => {
       const k = r.clone();
-      caches.open(C).then(c => c.put(e.request, k));
+      if (r.ok || r.type === 'opaque') await caches.open(C).then(c => c.put(e.request, k)).catch(() => {});
       return r;
-    }).catch(() => caches.match(e.request).then(r => r || (same ? caches.match('/index.html') : Response.error())))
+    }).catch(() => caches.match(e.request).then(r => r || (same && e.request.mode === 'navigate' ? caches.match('/index.html') : Response.error())))
   );
 });

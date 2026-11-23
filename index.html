@@ -17,7 +17,7 @@
       const VOL = { nav: .8, pick: .8, error: .8 }, GAP = { nav: 40, pick: 40, error: 150 };
       const CLICKABLE = 'button,a[href],summary,[role=button],[role=tab],.pill,[onclick]';
       /* Controls that only move you around, even when styled as primary buttons. */
-      const NAV_ONLY = /openSign|closeSign|startTour|tourGo|endTour|openScanner|closeScanner|scNext|showQr|toggleND|togSound|viewInsp|viewEv|editStart|relAsk|logout|openOrderQrModal|closeOrderQrModal|dlOrderReceipt/;
+      const NAV_ONLY = /openSign|closeSign|startTour|tourGo|endTour|openScanner|closeScanner|scNext|showQr|toggleND|togSound|viewInsp|viewEv|editStart|relAsk|logout|openOrderQrModal|closeOrderQrModal|openOrderReceiptModal|closeOrderReceiptModal|printOrderReceipt|dlOrderReceipt/;
       /* Controls that commit a choice, even when styled as secondary buttons. */
       const PICK = /raiseBid|claim|askDone\(true\)/;
       const ERR = /delQ/;
@@ -116,21 +116,32 @@
   <meta name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>DEAL Navotas</title>
+  <meta name="description" content="Digital Consignation System for Fisheries Trade at Navotas Fish Port Complex">
+  <meta property="og:title" content="DEAL Navotas">
+  <meta property="og:description" content="Digital Consignation System for Fisheries Trade at Navotas Fish Port Complex">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script>tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['Inter', 'sans-serif'] } } } }</script>
-  <style type="text/tailwindcss">
-    @layer components{
-.badge{@apply text-xs font-mono uppercase px-2 py-0.5 rounded font-semibold inline-block}
-.btn{@apply w-full sm:w-auto rounded-xl bg-[#006878] hover:bg-[#0B4A5D] text-white font-semibold py-2.5 px-4 max-h-12 text-sm inline-flex items-center justify-center gap-1.5 transition-colors disabled:bg-slate-200 disabled:text-slate-700 disabled:cursor-not-allowed}
-.btn2{@apply w-full sm:w-auto rounded-xl border border-slate-300 bg-white font-semibold py-2.5 px-4 max-h-12 text-sm inline-flex items-center justify-center gap-1.5 hover:bg-slate-50}
-.inp{@apply w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#006878]}
-.lbl{@apply block text-sm font-medium mb-1 mt-3}
-.card{@apply rounded-xl bg-white border border-slate-200 shadow-sm}
-.sbb{@apply w-full flex items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-left hover:bg-slate-50}
-.pill{@apply px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-slate-100}
-.pill.on{@apply bg-[#006878] text-white}}
-</style>
+  <style>
+    .badge{font-size:.75rem;line-height:1rem;font-family:Inter,sans-serif;text-transform:uppercase;padding:.125rem .5rem;border-radius:.25rem;font-weight:600;display:inline-block}
+    .btn{width:100%;border-radius:.75rem;background-color:#006878;color:#fff;font-weight:600;padding:.625rem 1rem;max-height:3rem;font-size:.875rem;line-height:1.25rem;display:inline-flex;align-items:center;justify-content:center;gap:.375rem;transition:color .15s cubic-bezier(.4,0,.2,1),background-color .15s cubic-bezier(.4,0,.2,1),border-color .15s cubic-bezier(.4,0,.2,1)}
+    .btn:hover{background-color:#0B4A5D}
+    .btn:disabled{background-color:#e2e8f0;color:#334155;cursor:not-allowed}
+    .btn2{width:100%;border-radius:.75rem;border:1px solid #cbd5e1;background-color:#fff;font-weight:600;padding:.625rem 1rem;max-height:3rem;font-size:.875rem;line-height:1.25rem;display:inline-flex;align-items:center;justify-content:center;gap:.375rem}
+    .btn2:hover{background-color:#f8fafc}
+    @media (min-width:640px){.btn,.btn2{width:auto}}
+    .inp{width:100%;border:1px solid #cbd5e1;border-radius:.5rem;padding:.625rem .75rem;font-size:.875rem;line-height:1.25rem;background-color:#fff}
+    .inp:focus{outline:none;box-shadow:0 0 0 2px #006878}
+    .lbl{display:block;font-size:.875rem;line-height:1.25rem;font-weight:500;margin-bottom:.25rem;margin-top:.75rem}
+    .card{border-radius:.75rem;background-color:#fff;border:1px solid #e2e8f0;box-shadow:0 1px 2px 0 rgb(0 0 0 / .05)}
+    .sbb{width:100%;display:flex;align-items:center;justify-content:space-between;gap:.5rem;border-radius:.5rem;border:1px solid #cbd5e1;background-color:#fff;padding:.625rem .75rem;font-size:.875rem;line-height:1.25rem;font-weight:500;text-align:left}
+    .sbb:hover{background-color:#f8fafc}
+    .pill{padding:.5rem .75rem;border-radius:.5rem;font-size:.875rem;line-height:1.25rem;font-weight:500;white-space:nowrap}
+    .pill:hover{background-color:#f1f5f9}
+    .pill.on{background-color:#006878;color:#fff}
+  </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -148,8 +159,50 @@
     .dark .bg-white,
     .dark .card,
     .dark .inp,
-    .dark .btn2 {
+    .dark .btn2,
+    .dark .sbb {
       background: #111827
+    }
+
+    .dark .sbb {
+      color: #e2e8f0;
+      border-color: #334155
+    }
+
+    .dark .btn2:hover,
+    .dark .sbb:hover,
+    .dark .pill:hover {
+      background: #1e293b
+    }
+
+    .qr-frame,
+    .dark .qr-frame,
+    .qr-white-box,
+    .dark .qr-white-box {
+      background: #ffffff !important;
+      color: #000000 !important;
+    }
+
+    @media print {
+      body.printing-receipt > :not(#ordReceiptLayer) {
+        display: none !important;
+      }
+      #ordReceiptLayer {
+        position: static !important;
+        inset: auto !important;
+        background: #ffffff !important;
+        padding: 0 !important;
+      }
+      #ordReceiptLayer .card {
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1 !important;
+        background: #ffffff !important;
+        color: #0B0E17 !important;
+        max-width: 100% !important;
+      }
+      #ordReceiptLayer .no-print {
+        display: none !important;
+      }
     }
 
     .dark .bg-slate-50 {
@@ -1671,12 +1724,13 @@
 
     // ---> sign-in and account access <---
     const PIERS = ['Pier 1 Bay A (Dagupan & GenSan Vessels)', 'Pier 2 Dock B', 'Pier 3 Slipway'];
-    const LBL = { vendor: ['Mobile Phone Number', '09XX-XXX-XXXX'], checker: ['Tally Officer Badge ID', 'TC-NAV-###'], broker: ['Broker Official License #', 'BKR-NAV-####'] };
+    const LBL = { vendor: ['Mobile Phone Number', '+63 XXX XXX XXXX'], checker: ['Tally Officer Badge ID', 'TC-NAV-###'], broker: ['Broker Official License #', 'BKR-NAV-####'] };
     //-> Function: login()
     //-> Builds the role-specific sign-in or registration form; its submit action delegates validation and authentication to doLogin().
     //-> Registration agreements: two mandatory checkboxes (#t1 Terms of Service, #t2 Privacy Policy).
     //-> signBlocked() is true while creating an account and either box is unchecked; signChk() syncs the button, hint and inline errors.
-    const LEGAL = { terms: '/terms.html', privacy: '/privacy.html' };
+    const LEGAL = { terms: { EN: 'https://docs.google.com/document/d/1bgbCQY7gdXZSwbp7yFu3DmVNM24QOWh9Knp-Bb-5J4/edit?tab=t.0', TL: 'https://docs.google.com/document/d/1h0j4x9wpf-MoQlbvExGr37oRX-B1PX0wNDFE5U6T0j0/edit?tab=t.0' }, privacy: { EN: 'https://docs.google.com/document/d/1injxjSqetysH4PY0Z2MnYXoDdglMwV-EfQTdfCXNlk/edit?tab=t.0', TL: 'https://docs.google.com/document/d/1vIn_WRwBQoOUVkTnsJ79txWc8BWmykEPoRpPMRF0EmQ/edit?tab=t.0' } };
+    const legalLink = kind => LEGAL[kind][S.lang === 'EN' ? 'EN' : 'TL'];
     function signBlocked() { if (AM !== 'up' || S.user) return false; const a = $('#t1'), b = $('#t2'); return !(a && b && a.checked && b.checked) }
     function signChk(force) {
       const a = $('#t1'), b = $('#t2'), btn = $('[data-k=login]'); if (!a || !b) return;
@@ -1689,21 +1743,38 @@
       if (btn && !BUSY.has('login')) { btn.disabled = block; btn.setAttribute('aria-disabled', block ? 'true' : 'false') }
       if (h) h.textContent = tr(block ? 'Check both boxes to enable Create Account.' : 'Thanks. You can create your account now.')
     }
+    function phoneFormat(value) {
+      let digits = String(value || '').replace(/\D/g, '');
+      if (digits.startsWith('63')) digits = digits.slice(2);
+      else if (digits.startsWith('0')) digits = digits.slice(1);
+      digits = digits.slice(0, 10);
+      return '+63 ' + digits.slice(0, 3) + (digits.length > 3 ? ' ' + digits.slice(3, 6) : '') + (digits.length > 6 ? ' ' + digits.slice(6) : '');
+    }
+    function phoneInput(el) {
+      const before = el.value.slice(0, el.selectionStart).replace(/\D/g, '').length;
+      el.value = phoneFormat(el.value);
+      let cursor = 0, count = 0;
+      while (cursor < el.value.length && count < Math.max(2, before)) { if (/\d/.test(el.value[cursor])) count++; cursor++; }
+      el.setSelectionRange(cursor, cursor);
+    }
+    function phoneBeforeInput(e) {
+      const el = e.target;
+      if (e.inputType.startsWith('delete') && el.selectionStart <= 4 && el.selectionEnd <= 4) e.preventDefault();
+    }
     function login() {
       const SAVED = accGet()[LR]; return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex p-4 z-40 overflow-y-auto overscroll-contain"><div class="card w-full max-w-md p-6 m-auto" role="dialog" aria-modal="true" aria-label="Sign in"><button onclick="closeSign()" aria-label="Close" class="float-right text-2xl leading-none px-1">×</button>
  <span class="badge bg-[#006878] text-white">Navotas Port Authority verified access</span>
  <h2 class="font-mono font-bold text-xl mt-2">Sign In: DEAL Port Access</h2><p class="text-sm text-slate-500 keep-c">Authorized sign-in for micro-vendors, checkers, and consignee brokers</p>
  <div class="grid grid-cols-3 gap-1 bg-slate-100 border border-slate-300 p-1 rounded-xl my-4" role="tablist">${[['vendor', 'Micro-Vendor'], ['checker', 'Pier Checker'], ['broker', 'Consignee Broker']].map(([r, l]) => `<button onclick="LR='${r}';paintSign()" role="tab" aria-selected="${LR === r}" class="py-2 rounded-lg text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-[#006878] ${LR === r ? 'bg-[#006878] text-white' : ''}">${l}</button>`).join('')}</div>
  ${sb ? '' : '<p class="text-sm bg-amber-50 border border-amber-300 rounded-lg p-3">Setup needed: add your Supabase URL and anon key to config.js.</p>'}
- ${AM === 'up' && LR !== 'vendor' ? `<label class="lbl">Full name</label><input id="f0" class="inp" maxlength="80" autocomplete="name"><p class="text-xs text-slate-500 mt-2">We will create your ID for you when you finish.</p>` : `${AM === 'up' ? `<label class="lbl">Full name</label><input id="f0" class="inp" maxlength="80" autocomplete="name" placeholder="e.g. Juan Dela Cruz">` : ''}<label class="lbl">${LBL[LR][0]}</label><input id="f1" class="inp" placeholder="${LBL[LR][1]}" autocomplete="username" ${SAVED && AM === 'in' ? `value="${esc(SAVED.ident)}"` : ''}>`}
+ ${AM === 'up' ? `<label class="lbl">Full name</label><input id="f0" class="inp" maxlength="80" autocomplete="name" placeholder="e.g. Juan Dela Cruz">` : ''}<label class="lbl">Mobile Phone Number</label><input id="f1" class="inp" type="tel" inputmode="numeric" autocomplete="username" placeholder="+63 XXX XXX XXXX" oninput="phoneInput(this)" onbeforeinput="phoneBeforeInput(event)" value="${phoneFormat(SAVED && AM === 'in' && /^09/.test(SAVED.ident) ? SAVED.ident : '')}">
  <label class="lbl">Password</label><div class="relative"><input id="f2" type="password" class="inp !pr-11" autocomplete="${AM === 'up' ? 'new-password' : 'current-password'}" placeholder="${AM === 'up' ? '8+ characters, letters and numbers' : ''}"><button type="button" onclick="togglePw('f2',this)" aria-label="Show password" aria-pressed="false" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-500 hover:text-[#006878]" title="Show/hide password"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
  ${AM === 'up' && LR !== 'vendor' ? `<label class="lbl">${LR === 'checker' ? 'Assigned Dockside Pier Station' : 'Pier Location'}</label><select id="f3" class="inp pier-select">${PIERS.map(x => `<option>${x}</option>`).join('')}</select>` : ''}
  
- ${AM === 'up' && LR !== 'vendor' ? `<label class="lbl">Mobile Phone Number (optional)</label><input id="f5" class="inp" placeholder="09XX-XXX-XXXX" autocomplete="tel">` : ''}
  <label class="flex items-center gap-2 text-sm mt-3"><input id="f6" type="checkbox" checked class="h-4 w-4 accent-[#006878]"><span>Remember this device</span></label>
  ${AM === 'up' ? `<fieldset class="mt-3 border-0 p-0 m-0" aria-describedby="tcHint"><legend class="sr-only">Agreements</legend>
- <div><label class="flex items-start gap-2 text-sm"><input id="t1" type="checkbox" required aria-required="true" aria-invalid="false" aria-describedby="t1e" class="h-4 w-4 mt-0.5 shrink-0 accent-[#006878]" onchange="this.dataset.t='1';signChk()"><span><span>I agree to the</span> <a href="${LEGAL.terms}" target="_blank" rel="noopener" class="underline font-semibold text-[#006878]">Terms of Service</a><span class="text-red-600" aria-hidden="true"> *</span></span></label><p id="t1e" class="hidden text-xs text-red-600 mt-1 ml-6" role="alert"></p></div>
- <div class="mt-2"><label class="flex items-start gap-2 text-sm"><input id="t2" type="checkbox" required aria-required="true" aria-invalid="false" aria-describedby="t2e" class="h-4 w-4 mt-0.5 shrink-0 accent-[#006878]" onchange="this.dataset.t='1';signChk()"><span><span>I accept the</span> <a href="${LEGAL.privacy}" target="_blank" rel="noopener" class="underline font-semibold text-[#006878]">Privacy Policy</a><span class="text-red-600" aria-hidden="true"> *</span></span></label><p id="t2e" class="hidden text-xs text-red-600 mt-1 ml-6" role="alert"></p></div>
+ <div><label class="flex items-start gap-2 text-sm"><input id="t1" type="checkbox" required aria-required="true" aria-invalid="false" aria-describedby="t1e" class="h-4 w-4 mt-0.5 shrink-0 accent-[#006878]" onchange="this.dataset.t='1';signChk()"><span><span>I agree to the</span> <a href="${legalLink('terms')}" target="_blank" rel="noopener" class="underline font-semibold text-[#006878]">Terms of Service</a><span class="text-red-600" aria-hidden="true"> *</span></span></label><p id="t1e" class="hidden text-xs text-red-600 mt-1 ml-6" role="alert"></p></div>
+ <div class="mt-2"><label class="flex items-start gap-2 text-sm"><input id="t2" type="checkbox" required aria-required="true" aria-invalid="false" aria-describedby="t2e" class="h-4 w-4 mt-0.5 shrink-0 accent-[#006878]" onchange="this.dataset.t='1';signChk()"><span><span>I accept the</span> <a href="${legalLink('privacy')}" target="_blank" rel="noopener" class="underline font-semibold text-[#006878]">Privacy Policy</a><span class="text-red-600" aria-hidden="true"> *</span></span></label><p id="t2e" class="hidden text-xs text-red-600 mt-1 ml-6" role="alert"></p></div>
  <p id="tcHint" class="text-xs text-slate-500 mt-2" aria-live="polite">Check both boxes to enable Create Account.</p></fieldset>`: ''}
  <div class="text-xs text-[#006878] flex justify-center my-3 font-medium"><span>Auto sign-out after 15 min idle</span></div>
  <button class="btn !w-full" data-k="login" ${AM === 'up' ? 'disabled aria-disabled="true"' : ''} onclick="run(this,'${AM === 'in' ? 'Signing in…' : 'Creating account…'}',doLogin)">${AM === 'in' ? { vendor: 'ENTER MICRO-VENDOR PORTAL', checker: 'ENTER PIER CHECKER PORTAL', broker: 'ENTER BROKER PORTAL' }[LR] : 'CREATE ACCOUNT'}</button>
@@ -1777,28 +1848,29 @@
     //-> Function: doLogin()
     //-> Validates the selected role's identifier and password, then signs in or registers through Supabase.
     //-> Staff account creation also claims a registered identity/PIN; validation and server errors are shown to the user.
+    function fieldError(id, message) { const field = $('#' + id); if (!field) return toast(message, 1); let hint = $('#' + id + '-error'); if (!hint) { hint = document.createElement('p'); hint.id = id + '-error'; hint.className = 'text-sm text-red-700 mt-1'; hint.setAttribute('role', 'alert'); field.insertAdjacentElement('afterend', hint); } hint.textContent = tr(message); field.setAttribute('aria-invalid', 'true'); field.setAttribute('aria-describedby', hint.id); field.addEventListener('input', () => { hint.remove(); field.removeAttribute('aria-invalid'); field.removeAttribute('aria-describedby'); }, { once: true }); field.focus(); }
     async function doLogin() {
       S.rem = !($('#f6') && !$('#f6').checked);
       if (signBlocked()) { signChk(1); return toast('Please agree to the Terms of Service and accept the Privacy Policy to create an account.', 1) }
       if (!sb && online()) return toast('Add your Supabase URL and anon key to config.js first.', 1);
       const wait = Math.ceil((lockUntil - Date.now()) / 1000); if (wait > 0) return toast(`Too many attempts. Try again in ${wait}s.`, 1);
       if (AM === 'up' && !online()) return toast('You need an internet connection to create an account.', 1);
-      if (AM === 'up' && LR !== 'vendor') return staffSignup();
-      const a = vl('f1').trim(), p = vl('f2'), fn = AM === 'up' ? vl('f0').trim().replace(/\s+/g, ' ') : '', re = { vendor: /^09\d{2}-?\d{3}-?\d{4}$/, checker: /^TC-NAV-\d+$/i, broker: /^BKR-NAV-\d+$/i }[LR];
-      if (!re.test(a)) return toast(`Enter a valid ${LBL[LR][0]} (${LBL[LR][1]}).`, 1);
-      if (AM === 'up' && LR === 'vendor' && fn.length < 3) return toast('Enter your full name.', 1);
-      if (AM === 'up' && (p.length < 8 || !/\d/.test(p) || !/[a-z]/i.test(p))) return toast('Password needs 8+ characters with letters and numbers.', 1);
+      
+      const a = '0' + vl('f1').replace(/\D/g, '').replace(/^63/, ''), p = vl('f2'), fn = AM === 'up' ? vl('f0').trim().replace(/\s+/g, ' ') : '', re = /^09\d{9}$/;
+      if (!re.test(a)) return fieldError('f1', 'Enter a valid mobile phone number (+63 XXX XXX XXXX).');
+      if (AM === 'up' && fn.length < 3) return fieldError('f0', 'Enter your full name.');
+      if (AM === 'up' && (p.length < 8 || !/\d/.test(p) || !/[a-z]/i.test(p))) return fieldError('f2', 'Password needs 8+ characters with letters and numbers.');
       const email = a.replace(/-/g, '').toLowerCase() + '@deal-navotas.app';
       if (AM === 'up') {
-        const need = LR !== 'vendor'; if (need && !vl('f4').trim()) return toast('Enter your personal PIN.', 1);
+        const need = LR !== 'vendor';
         let r = await sb.auth.signUp({ email, password: p });
         if (r.error && /regist/i.test(r.error.message)) r = await sb.auth.signInWithPassword({ email, password: p });
         if (r.error || !r.data.session) return toast(r.error ? 'That ID is already registered. Try signing in.' : 'Sign-up needs "Confirm email" turned off in Supabase.', 1);
         const ex = await sb.from('profiles').select('id').maybeSingle();
         if (!ex.data) {
           const row = { id: r.data.user.id, role: LR, approved: true, ident: a.toUpperCase(), station: LR === 'checker' ? vl('f3') : null, full_name: fn || null };
-          const q = need ? await sb.rpc('claim_identity', { p_role: LR, p_ident: a, p_station: LR === 'checker' ? vl('f3') : null, p_pin: vl('f4').trim() }) : await sb.from('profiles').insert(row);
-          if (q.error || (need && q.data !== 'ok')) { await sb.auth.signOut(); return toast(q.data === 'locked' ? 'Too many wrong PIN attempts. Contact the pilot admin.' : q.data === 'denied' ? 'This ID or PIN is not recognized. Contact the pilot admin.' : /duplicate|already/i.test((q.error && q.error.message) || '') ? 'This ID already has an account. Try signing in.' : 'Could not create the profile. Check your ID format and try again.', 1) }
+          const q = need ? await sb.rpc('request_phone_staff_profile', { p_role: LR, p_phone: a, p_name: fn, p_station: vl('f3') }) : await sb.from('profiles').insert(row);
+          if (q.error || (need && q.data !== 'active')) { await sb.auth.signOut(); return toast(/duplicate|already/i.test((q.error && q.error.message) || '') ? 'This phone number already has an account. Try signing in.' : 'Could not create the profile. Check your details and try again.', 1) }
           tutPend(r.data.user.id)
         }
         AM = 'in'; if (await enter(LR)) await credAfterLogin(email, p); return
@@ -1808,19 +1880,28 @@
       if (error) { if (isNetErr(error)) return offlineAttempt(email, p); if (++fails >= 5) { fails = 0; lockUntil = Date.now() + 60000 } return toast(WRONG, 1) }
       fails = 0; OFFPW = null; if (await enter(LR)) await credAfterLogin(email, p)
     }
+    async function legacyStaffLogin() {
+      const id = prompt('Enter your existing checker or broker ID:'); if (!id) return;
+      const password = vl('f2'); if (!password) return fieldError('f2', 'Enter your password first.');
+      if (!online()) return toast('Connect to the internet to use an existing staff ID.', 1);
+      const email = id.trim().replace(/-/g, '').toLowerCase() + '@deal-navotas.app';
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) return toast(WRONG, 1);
+      if (await enter(LR)) await credAfterLogin(email, password);
+    }
     //-> Function: staffSignup()
     //-> Creates a checker or broker account from the submitted name, password, pier, and optional phone number.
     //-> Calls Supabase auth and profile creation, then displays the generated account ID on success.
     async function staffSignup() {
       S.rem = !($('#f6') && !$('#f6').checked);
-      const name = vl('f0').trim(), p = vl('f2'), st = vl('f3'), ph = vl('f5').trim();
-      if (name.length < 3) return toast('Enter your full name.', 1);
-      if (ph && !/^09\d{2}-?\d{3}-?\d{4}$/.test(ph)) return toast('Enter a valid Mobile Phone Number (09XX-XXX-XXXX).', 1);
-      if (p.length < 8 || !/\d/.test(p) || !/[a-z]/i.test(p)) return toast('Password needs 8+ characters with letters and numbers.', 1);
+      const name = vl('f0').trim(), p = vl('f2'), st = vl('f3'), ph = vl('f5').replace(/\D/g, '');
+      if (name.length < 3) return fieldError('f0', 'Enter your full name.');
+      if (ph !== '09' && !/^09\d{9}$/.test(ph)) return fieldError('f5', 'Enter a valid Mobile Phone Number (09XX XXX XXXX).');
+      if (p.length < 8 || !/\d/.test(p) || !/[a-z]/i.test(p)) return fieldError('f2', 'Password needs 8+ characters with letters and numbers.');
       const { data: id, error: e1 } = await sb.rpc('new_badge', { p_role: LR }); if (e1 || !id) return toast(e1 ? 'Could not create your ID: ' + e1.message : 'Could not create your ID. Try again.', 1);
       const r = await sb.auth.signUp({ email: id.replace(/-/g, '').toLowerCase() + '@deal-navotas.app', password: p });
       if (r.error || !r.data.session) return toast(r.error ? r.error.message : 'Sign-up needs "Confirm email" turned off in Supabase.', 1);
-      const q = await sb.rpc('create_staff_profile', { p_role: LR, p_ident: id, p_name: name, p_station: st, p_phone: ph || null });
+      const q = await sb.rpc('create_staff_profile', { p_role: LR, p_ident: id, p_name: name, p_station: st, p_phone: ph === '09' ? null : ph });
       if (q.error) { await sb.auth.signOut(); return toast('Could not create the profile. Try again.', 1) }
       tutPend(r.data.user.id); S.newId = id; AM = 'in'; if (await enter(LR)) await credAfterLogin(id.replace(/-/g, '').toLowerCase() + '@deal-navotas.app', p)
     }
@@ -1850,12 +1931,12 @@
       }
       if (!user) return false;
       const { data: p } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      if (!p || !p.approved || (want && p.role !== want)) { await sb.auth.signOut(); toast(!p ? 'No profile found for this account.' : !p.approved ? 'Account is awaiting admin approval.' : 'This account is not registered for this portal.', 1); return false }
-      if (want && S.rem !== false) accSave(p.role, p.ident); if (want) S.dark = false; S.user = p.ident; S.name = p.full_name || p.name || p.ident; S.avatar = p.avatar_url || p.avatar || null; S.uid = user.id; S.role = p.role; S.tutDue = tutDueFor(user.id); S.station = p.station || 'Pier 1-3'; S.tab = TABS[p.role][0][0]; S.offlineSession = false; userScope();
+      if (!p || !p.approved || (want && p.role !== want)) { await sb.auth.signOut(); toast(!p ? 'No profile found for this account.' : !p.approved ? 'This account is inactive. Contact support.' : 'This account is not registered for this portal.', 1); return false }
+      if (want && S.rem !== false) accSave(p.role, (user.email || '').endsWith('@deal-navotas.app') ? user.email.split('@')[0] : p.ident); if (want) S.dark = false; S.user = p.ident; S.name = p.full_name || p.name || p.ident; S.avatar = p.avatar_url || p.avatar || null; S.uid = user.id; S.role = p.role; S.tutDue = tutDueFor(user.id); S.station = p.station || 'Pier 1-3'; S.tab = TABS[p.role][0][0]; S.offlineSession = false; userScope();
       const _pre = (async () => { try { await devSync(!!want); await prefsPull(); S.tutDue = tutDueFor(user.id) } catch (e) { } })();
       await Promise.all([_pre, load(1)]); if (ch) { try { sb.removeChannel(ch) } catch (e) { } } ch = sb.channel('deal').on('postgres_changes', { event: '*', schema: 'public' }, () => { clearTimeout(window.__lt); window.__lt = setTimeout(() => load(1), 600) }).subscribe(liveStatus); startAuctionLoops(); bump(); render(); return true
     }
-    async function logout() { S.lang = 'EN'; S.dark = false; closeScanner(); S.pm = null; S.pay = null; S.pass = null; S.bp = null; S.br = null; try { await sb.auth.signOut({ scope: 'local' }); if (ch) sb.removeChannel(ch) } catch (e) { } clearStaleAuthTokens(); stopAuctionLoops(); SQ = ''; SF = 'all'; S.queue = []; S.ordStatus = {}; S.offlineSession = false; S.offEmail = null; OFFPW = null; S.name = null; S.user = null; S.uid = null; S.live = 'off'; S.bids = []; S.catches = []; S.passes = []; S.checks = []; render() }
+    async function logout() { S.lang = 'EN'; S.dark = false; closeScanner(); S.pm = null; S.pay = null; S.pass = null; S.bp = null; S.br = null; try { await sb.auth.signOut({ scope: 'local' }); if (ch) sb.removeChannel(ch) } catch (e) { } clearStaleAuthTokens(); stopAuctionLoops(); SQ = ''; SF = 'all'; S.queue = []; S.ordStatus = {}; S.offlineSession = false; S.offEmail = null; OFFPW = null; S.name = null; S.user = null; S.uid = null; S.hiddenOrders = []; S.live = 'off'; S.bids = []; S.catches = []; S.passes = []; S.checks = []; render() }
     addEventListener('storage', async e => {
       if (e.key && /^sb-.*-auth-token/.test(e.key) && S.uid) {
         try {
@@ -1877,13 +1958,13 @@
       if (S.catches.some(x => x.auction_ends && !x.settled_at && Date.parse(x.auction_ends) <= Date.now())) await sb.rpc('settle_due_auctions');
       const [c, p, k, b, os] = await Promise.all([sb.from('catches').select('*').order('id'), sb.from('passes').select('*').order('created_at', { ascending: false }), sb.from('checks').select('id,cid,name,res,by_name,created_at').order('created_at', { ascending: false }).limit(500),
       S.role === 'broker' ? sb.from('bids').select('id,cid,broker_id,broker_ident,amount,created_at').order('created_at', { ascending: false }).limit(300) : Promise.resolve({ data: [] }), Promise.resolve({ data: null, error: true })]);
-      if (c.error) return toast('Could not load data. Showing the last saved copy.', 1);
+      if (c.error) { S.loadWarning = 'catches and related data'; render(); return toast('Could not load data. Showing the last saved copy.', 1); }
       const old = Object.fromEntries(S.catches.map(x => [x.id, x]));
       S.catches = c.data.map(x => { ['name', 'sci', 'src', 'bid_by_ident', 'winner_ident'].forEach(f => x[f] = esc(x[f])); x.bid = +x.bid; x.bid_count = +x.bid_count || 0; if (!/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(x.photo || '')) x.photo = null; return normLot(x) });
-      S.bids = (b.data || []).map(x => ({ ...x, broker_ident: esc(x.broker_ident), amount: +x.amount }));
-      S.passes = (p.data || []).filter(passMine).map(x => ({ ...x, name: esc(x.name), t: new Date(x.created_at).toLocaleString() }));
+      S.bids = b.error ? S.bids : (b.data || []).map(x => ({ ...x, broker_ident: esc(x.broker_ident), amount: +x.amount }));
+      S.passes = p.error ? S.passes : (p.data || []).filter(passMine).map(x => ({ ...x, name: esc(x.name), t: new Date(x.created_at).toLocaleString() }));
       try { localStorage.setItem('deal-hist-' + S.uid, JSON.stringify(S.passes.map(({ pass_token, ...r }) => r))) } catch (e) { }
-      S.checks = (k.data || []).map(x => ({ id: x.cid, name: esc(x.name), res: x.res, by: esc(x.by_name), t: new Date(x.created_at).toLocaleString(), iso: x.created_at, rid: Number(x.id) }));
+      S.checks = k.error ? S.checks : (k.data || []).map(x => ({ id: x.cid, name: esc(x.name), res: x.res, by: esc(x.by_name), t: new Date(x.created_at).toLocaleString(), iso: x.created_at, rid: Number(x.id) }));
       if (!p.error && S.catches.length === 0 && S.passes.length === 0) {
         if (ordRead().length) ordWrite([]);
         try { Object.keys(localStorage).filter(k => /^(deal-cache|deal-hist-|deal-pay-|deal-bidpay-|deal-bp-|deal-logged-|deal-soldseen-)/.test(k)).forEach(k => localStorage.removeItem(k)) } catch (e) { }
@@ -1905,7 +1986,7 @@
         }
         if (!o.verified && x.verified) noteFor(['checker', 'broker'], 'Inspection update', `${x.id} passed Suri-Isda.`); if (o.verified && !x.verified) noteFor(['checker', 'broker'], 'Inspection update', `${x.id} flagged for review.`)
       }
-      await _so; if (os && !os.error) S.ordStatus = Object.fromEntries((os.data || []).map(r => [r.order_id, r]));
+      await _so; S.loadWarning = [p.error && 'passes', k.error && 'inspections', b.error && 'bids', S.orderLoadError && 'orders or messages'].filter(Boolean).join(', '); if (os && !os.error) S.ordStatus = Object.fromEntries((os.data || []).map(r => [r.order_id, r]));
       if (typeof syncPierAcquisitions === 'function') syncPierAcquisitions(S.catches, S.loaded);
       applyOrderStatus(S.loaded);
       if (typeof syncVendorOrdersFromPasses === 'function') syncVendorOrdersFromPasses(S.passes);
@@ -1936,18 +2017,21 @@
       return new Promise(res => {
         askDone(false); askRes = res; const d = document.createElement('div'); d.id = 'askLayer'; d.className = 'fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-[55]';
         d.innerHTML = `<div class="card w-full max-w-sm p-5" role="alertdialog" aria-modal="true" aria-labelledby="askT"><h2 id="askT" class="font-mono font-bold text-lg">${esc(title)}</h2><p class="text-sm text-slate-600 mt-2">${esc(body)}</p><div class="flex gap-2 mt-4"><button class="btn2 flex-1" onclick="askDone(false)">Cancel</button><button id="askOk" class="btn flex-1" ${danger ? 'style="background:#b91c1c"' : ''} onclick="askDone(true)">${esc(ok)}</button></div></div>`;
-        document.body.append(d); trDom(d); $('#askOk').focus()
+        document.body.append(d); trDom(d); d.querySelector('button').focus()
       })
     }
     //-> Function: askDone(confirmed)
     //-> Closes the confirmation dialog and resolves the outstanding ask() promise with the supplied boolean.
-    function askDone(v) { const d = $('#askLayer'); if (d) d.remove(); const r = askRes; askRes = null; if (r) r(v) }
+    function askDone(v) { const d = $('#askLayer'); if (d) d.remove(); const r = askRes; askRes = null; if (r) { restoreFocus(); r(v) } }
     addEventListener('keydown', e => {
       if (e.key === 'Enter' && !S.user && /^f[0-5]$/.test(e.target.id || '')) { const b = $('[data-k=login]'); if (b) { if (signBlocked()) signChk(1); else b.click() } return }
       if ((e.key === 'n' || e.key === 'N') && S.user && !e.ctrlKey && !e.metaKey && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName || '')) { toggleND(); return }
       if ((e.key === 'Delete' || e.key === 'Backspace') && e.target.dataset && e.target.dataset.qi !== undefined) { e.preventDefault(); delQ(+e.target.dataset.qi); return }
       if (e.key !== 'Escape') return;
       if ($('#askLayer')) { askDone(false); return restoreFocus() }
+      if ($('#ordQrLayer')) { closeOrderQrModal(); return restoreFocus() }
+      if ($('#ordReceiptLayer')) { closeOrderReceiptModal(); return restoreFocus() }
+      if ($('#ordScanLayer')) { closeOrderScanner(); return restoreFocus() }
       if ($('#scanLayer')) { closeScanner(); return restoreFocus() }
       if (S.tour) { endTour(); return restoreFocus() }
       if (!S.user && S.go) return closeSign();
@@ -2138,13 +2222,13 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     //-> Queues the claim locally when offline; when online, submits the selected lot and kilograms through doClaim().
     async function pmConfirm() {
       const m = S.pm, c = m && find(m.id); if (!c) return; if (!vendorReady(c)) return toast('This lot is still awaiting broker auction settlement.', 1); if (m.over > open(c)) { pmErr(m.over); return toast(pmMsg(m.over, open(c)), 1) } const kg = pmClamp(c, m.kg);
-      S.pay = { id: m.id, kg, method: 'cash', fulfillment: 'broker_delivery', marketId: 'nepo', stallNote: '' }; S.pm = null; render()
+      S.pay = { id: m.id, kg, method: 'cash', fulfillment: 'broker_delivery', marketId: 'tres', stallNote: '' }; S.pm = null; render()
     }
     // ---> payment step (cash / cashless demo) + delivery mode before the escrow QR pass is generated <---
     const payModal = () => {
       const m = S.pay; if (!m) return ''; const c = find(m.id); if (!c) { S.pay = null; return '' }
       if (!m.fulfillment) m.fulfillment = 'broker_delivery';
-      if (!m.marketId) m.marketId = 'nepo';
+      if (!m.marketId) m.marketId = 'tres';
       const t = tar(c.price, m.kg), rt = m.fulfillment === 'broker_delivery' ? calcMarketRoute(m.marketId, 'L300 Van', m.kg) : null;
       const opt = (v, ic, l, s) => `<label class="flex gap-3 items-start border-2 rounded-lg p-3 mt-2 cursor-pointer ${m.method === v ? 'border-[#006878]' : ''}"><input type="radio" name="pmeth" class="mt-1" ${m.method === v ? 'checked' : ''} onchange="S.pay.method='${v}';render()"><span><b class="text-sm">${ic} ${l}</b><br><span class="text-xs text-slate-500">${s}</span></span></label>`;
       const delOpt = (v, ic, l, s) => `<label class="flex gap-3 items-start border-2 rounded-lg p-3 mt-2 cursor-pointer ${m.fulfillment === v ? 'border-[#006878]' : ''}"><input type="radio" name="pful" class="mt-1" ${m.fulfillment === v ? 'checked' : ''} onchange="S.pay.fulfillment='${v}';render()"><span><b class="text-sm">${ic} ${l}</b><br><span class="text-xs text-slate-500">${s}</span></span></label>`;
@@ -2156,10 +2240,10 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
  ${delOpt('self_pickup', '⚓', 'Self-Pickup at the Pier Dock', 'Pick up directly at the pier dock using your Escrow QR Pass.')}
  ${m.fulfillment === 'broker_delivery' ? `<div class="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50">
    <label class="lbl !mt-0">Designated Wet Market / Palengke</label>
-   <select class="inp" onchange="S.pay.marketId=this.value;render()">${Object.values(MARKETS).map(mk => `<option value="${mk.id}" ${m.marketId === mk.id ? 'selected' : ''}>${mk.name} (${mk.km} km)</option>`).join('')}</select>
+   <select class="inp" onchange="S.pay.marketId=this.value;render()">${Object.values(MARKETS).map(mk => `<option value="${mk.id}" ${m.marketId === mk.id ? 'selected' : ''}>${mk.name}</option>`).join('')}</select>
    <label class="lbl">Market Stall / Stand # (optional)</label>
    <input class="inp" placeholder="e.g. Stall 14, Fish Section" value="${esc(m.stallNote || '')}" oninput="S.pay.stallNote=this.value">
-   <div class="text-xs text-[#006878] font-mono mt-2">Est. Route: ${rt.km} km · ~${rt.etaText} · Est. Fleet Fee ${fmt(rt.transportFee)}</div>
+   <div class="text-xs text-slate-600 mt-2">Confirm the delivery location and fee with the broker.</div>
  </div>` : ''}
  <div class="text-xs font-mono text-slate-500 uppercase mt-3">Payment method</div>
  ${opt('cash', '💵', 'Cash', 'Hand the exact amount to the broker at dockside pickup or driver.')}${opt('cashless', '📱', 'Cashless', 'E-wallet or card payment.')}
@@ -2168,7 +2252,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
   <div class="flex justify-between gap-3"><span>Base portion cost</span><b class="font-mono">${fmt(t.base)}</b></div>
   <div class="flex justify-between gap-3"><span>Broker commission (5%), port fee & handling</span><b class="font-mono">${fmt(t.port + t.comm + t.ice)}</b></div>
   <div class="flex justify-between gap-3 border-t pt-2"><span class="font-semibold">Total payable</span><b class="text-emerald-600 font-bold font-mono text-lg">${fmt(t.total)}</b></div></div>
- <button data-k="pay" data-af class="btn !w-full mt-4" onclick="run(this,'Processing payment…',payGo)">Pay amount · ${fmt(t.total)}</button>
+ <button data-k="pay" data-af class="btn !w-full mt-4" onclick="run(this,'Processing payment…',payGo)">${m.method === 'cashless' ? 'Place claim (demo payment)' : 'Place claim (pay cash later)'} · ${fmt(t.total)}</button>
  <button class="btn2 mt-2 w-full" onclick="S.pm={id:S.pay.id,kg:S.pay.kg};S.pay=null;render()">Back</button></div></div>`};
     //-> Function: payGo()
     //-> Simulates the cashless step (demo), then claims the portion. Offline, the claim and its payment are saved on this device and sent when you sync.
@@ -2176,9 +2260,9 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       const m = S.pay, c = m && find(m.id); if (!c) return; if (!vendorReady(c)) return toast('This lot is still awaiting broker auction settlement.', 1); if (open(c) <= 0 || offFloor(c)) { S.pay = null; render(); return toast(ongoing(c) ? ONGMSG : 'This lot has just been fully claimed.', 1) }
       const kg = pmClamp(c, m.kg), rnd = Math.random().toString(36).slice(2, 8).toUpperCase();
       const pay = { method: m.method, ref: (m.method === 'cashless' ? 'DEMO-' : 'CASH-') + rnd, at: new Date().toISOString() };
-      const shipOpts = { fulfillment: m.fulfillment || 'broker_delivery', marketId: m.marketId || 'nepo', stallNote: (m.stallNote || '').trim() };
+      const shipOpts = { fulfillment: m.fulfillment || 'broker_delivery', marketId: m.marketId || 'tres', stallNote: (m.stallNote || '').trim() };
       if (m.method === 'cashless') await new Promise(r => setTimeout(r, 1200));
-      if (!online()) { S.queue.push({ sid: 'SYNC-' + Date.now().toString(36).slice(-4).toUpperCase(), id: m.id, kg, t: new Date().toLocaleTimeString(), pay, shipOpts }); S.pay = null; toast('Offline: claim and payment saved on this device. Sync when online.'); return render() }
+      if (!online()) { S.queue.push({ sid: 'SYNC-' + Date.now().toString(36).slice(-4).toUpperCase(), id: m.id, kg, t: new Date().toLocaleTimeString(), pay, shipOpts }); S.pay = null; toast('Claim request saved on this device. It is not confirmed until synced. No payment has been made.'); return render() }
       if (!await doClaim(m.id, kg, pay, shipOpts)) load(1)
     }
     const payMap = () => { try { return JSON.parse(localStorage.getItem('deal-pay-' + S.uid)) || {} } catch (e) { return {} } };
@@ -2218,7 +2302,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       const lot = find(id), newClaimed = lot ? (+lot.claimed || 0) + kg : kg, completedTubs = lot ? Math.floor((newClaimed + 1e-9) / (+lot.kg || 25)) : 1, wasLast = !!lot && remainingTubs(lot) <= completedTubs && kg >= open(lot) - 1e-9; const { data, error } = await sb.rpc('claim_portion', { p_cid: id, p_kg: kg }); if (error) { toast(error.message, 1); return false }
       if (lot) lot.remaining_tubs = Math.max(0, remainingTubs(lot) - completedTubs);
       if (pay && data && data.id) await paySave(data.id, pay);
-      if (lot && typeof createVendorOrder === 'function') createVendorOrder(lot, kg, data, pay, shipOpts || { fulfillment: 'broker_delivery', marketId: 'nepo', stallNote: '' });
+      if (lot && typeof createVendorOrder === 'function') createVendorOrder(lot, kg, data, pay, shipOpts || { fulfillment: 'broker_delivery', marketId: 'tres', stallNote: '' });
       S.pm = null; S.pay = null; S.pass = data && data.pass_token ? { ...data, pay, t: new Date(data.created_at).toLocaleString() } : null; await load(1); const nl = find(id); toast((pay && pay.method === 'cashless' ? 'Payment received. Escrow pass generated.' : pay ? 'Portion claimed. Pay cash at pickup. Pass generated.' : 'Portion claimed.') + (wasLast && nl && soldOut(nl) ? ' This lot is now Sold out.' : '')); render(); return true
     }
 
@@ -2253,7 +2337,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
    <div class="flex justify-between gap-3"><span>Commission (5%)</span><b class="font-mono">${fmt(t.comm)}</b></div>
    <div class="flex justify-between gap-3"><span>Ice / handling</span><b class="font-mono">${fmt(t.ice)}</b></div>
    <div class="flex justify-between gap-3 border-t pt-2"><span class="font-semibold">Total payable</span><b class="text-emerald-600 font-bold font-mono text-lg">${fmt(t.total)}</b></div></div>
-  <button data-k="bidpay" data-af class="btn !w-full mt-4" onclick="run(this,'Processing payment…',bpGo)">Pay amount · ${fmt(t.total)}</button>
+  <button data-k="bidpay" data-af class="btn !w-full mt-4" onclick="run(this,'Saving selection…',bpGo)">${m.method === 'cashless' ? 'Record demo payment' : 'Record cash payment'} · ${fmt(t.total)}</button>
   <button class="btn2 mt-2 w-full" onclick="S.bp=null;render()">Pay later</button></div></div>`};
     //-> Function: bpGo()
     //-> Simulates the cashless step (demo only), records the payment against the lot, then opens the receipt dialog.
@@ -2268,11 +2352,13 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     //-> Function: payQr(lot)
     //-> The broker's hand-off QR. It is drawn only on the Payment screen of a won lot, and never for a cancelled or rejected order.
     const payQr = c => {
-      let o = ordRead().find(x => x.id === 'ACQ-' + c.id);
-      if (!o) { syncPierAcquisitions([c], false); o = ordRead().find(x => x.id === 'ACQ-' + c.id) }
+      let o = ordRead().find(x => x.id === 'ACQ-' + c.id || (x.kind === 'pier_acquisition' && x.cid === c.id && x.status !== 'Rejected'));
+      if (!o) { syncPierAcquisitions([c], false); o = ordRead().find(x => x.id === 'ACQ-' + c.id || (x.kind === 'pier_acquisition' && x.cid === c.id && x.status !== 'Rejected')) }
       if (!o) return '';
       if (o.status === 'Cancelled' || o.status === 'Rejected') return `<p role="note" class="mt-3 text-xs font-semibold text-red-800 bg-red-50 border border-red-300 rounded-lg p-2">This order was ${o.status === 'Cancelled' ? 'cancelled' : 'rejected'}, so no hand-off QR is available.</p>`;
-      return `<div class="mt-3"><div class="text-xs font-mono text-slate-500 uppercase">Hand-off QR for the Pier Checker</div><div class="qr-frame rounded-xl p-2 mx-auto my-2 max-w-[200px] border border-slate-200 bg-white">${qrSvg(orderQrPayload(o))}</div></div>`
+      const qrText = validOrderQr(o);
+      if (!qrText) return '';
+      return `<div class="mt-3"><div class="text-xs font-mono text-slate-500 uppercase">Hand-off QR for the Pier Checker</div><div class="qr-frame qr-white-box rounded-xl p-2.5 mx-auto my-2 max-w-[220px] border border-slate-200 bg-white" style="background:#ffffff;color:#000000">${qrSvg(qrText)}</div></div>`
     };
     const brModal = () => {
       const id = S.br; if (!id) return ''; const c = find(id), p = bpOf(id); if (!c || !p) { S.br = null; return '' }
@@ -2303,13 +2389,15 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     //-> Draws the winning-bid payment receipt on a canvas and downloads it as a PNG.
     function dlBidReceipt(id) {
       const c = find(id), p = bpOf(id); if (!c || !p) return toast('No payment found for this lot.', 1);
+      const o = ordRead().find(x => x.id === 'ACQ-' + c.id || (x.kind === 'pier_acquisition' && x.cid === c.id && x.status !== 'Rejected'));
+      const qrText = validOrderQr(o);
       const t = tar(p.bid, p.kg), rn = 'BID-' + String(id).replace(/[^\w-]/g, '');
       const rows = [['Receipt no.', rn], ['Date', new Date(p.at || Date.now()).toLocaleString()], ['Broker', S.user || ''], ['Lot', String(c.id)], ['Catch', String(c.name || '')], ['Winning bid', fmt(p.bid) + '/kg'], ['Lot weight', p.kg + ' kg']];
       const items = [['Base (' + fmt(p.bid) + ' × ' + p.kg + ' kg)', fmt(t.base)], ['Port fee (₱2.50/kg)', fmt(t.port)], ['Commission (5%)', fmt(t.comm)], ['Ice / handling', fmt(t.ice)]];
       const pr = [['Payment method', payLbl(p.method)], ['Payment ref.', String(p.ref)], ['Status', 'Paid']];
       const notes = p.method === 'cashless' ? ['Cashless payment is for demo only. No real money was charged.'] : [];
-      const S2 = 2, W = 640, H = 150 + (rows.length + items.length + pr.length) * 30 + 90 + notes.length * 22 + 40, cv = document.createElement('canvas'); cv.width = W * S2; cv.height = H * S2;
-      const x = cv.getContext('2d'); x.scale(S2, S2); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+      const S2 = 2, W = 640, H = 150 + (rows.length + items.length + pr.length) * 30 + 90 + notes.length * 22 + 40 + (qrText ? 236 : 0), cv = document.createElement('canvas'); cv.width = W * S2; cv.height = H * S2;
+      const x = cv.getContext('2d'); x.scale(S2, S2); x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
       const SANS = '"Segoe UI",Roboto,Arial,sans-serif', MONO = '"Courier New",monospace'; let y = 48;
       x.fillStyle = '#0B0E17'; x.font = 'bold 26px ' + SANS; x.textAlign = 'center'; x.fillText('DEAL Navotas', W / 2, y); y += 26; x.font = '15px ' + SANS; x.fillStyle = '#475569'; x.fillText('Winning bid payment receipt', W / 2, y); y += 18;
       const line = () => { x.strokeStyle = '#cbd5e1'; x.setLineDash([5, 4]); x.beginPath(); x.moveTo(32, y); x.lineTo(W - 32, y); x.stroke(); x.setLineDash([]); y += 26 };
@@ -2319,6 +2407,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       x.textAlign = 'left'; x.fillStyle = '#0B0E17'; x.font = 'bold 18px ' + SANS; x.fillText('Total paid', 32, y + 4); x.textAlign = 'right'; x.fillStyle = '#059669'; x.font = 'bold 22px ' + MONO; x.fillText(fmt(p.total), W - 32, y + 4); y += 34;
       line(); pr.forEach(r => row(r[0], r[1])); y += 2;
       x.textAlign = 'center'; x.fillStyle = '#64748b'; x.font = '12px ' + SANS; notes.forEach(n => { x.fillText(n, W / 2, y); y += 22 });
+      if (qrText && drawQrOnCanvas(x, qrText, W / 2, y + 8, 184)) { y += 212; x.fillStyle = '#0B4A5D'; x.font = 'bold 12px ' + MONO; x.fillText('HAND-OFF QR · ' + o.id, W / 2, y); }
       cv.toBlob(bl => { if (!bl) return toast('Could not create the receipt.', 1); const u = URL.createObjectURL(bl), a = document.createElement('a'); a.href = u; a.download = 'receipt-' + rn + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); toast('Receipt downloaded.') }, 'image/png')
     }
 
@@ -2328,16 +2417,26 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     function qrSvg(t) {
       if (!window.qrcode) return '<p class="text-sm text-red-800">QR library not loaded. Reconnect and reopen this pass.</p>';
       const q = qrcode(0, 'M'); q.addData(t); q.make(); const n = q.getModuleCount(), m = 4; let d = ''; for (let r = 0; r < n; r++)for (let c = 0; c < n; c++)if (q.isDark(r, c)) d += `M${c + m} ${r + m}h1v1h-1z`;
-      return `<svg viewBox="0 0 ${n + 2 * m} ${n + 2 * m}" class="w-full h-auto block" shape-rendering="crispEdges" role="img" aria-label="Escrow pass QR code"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#000"/></svg>`
+      return `<svg viewBox="0 0 ${n + 2 * m} ${n + 2 * m}" class="w-full h-auto block" style="background:#ffffff" shape-rendering="crispEdges" role="img" aria-label="Order QR code"><rect width="100%" height="100%" fill="#ffffff"/><path d="${d}" fill="#000000"/></svg>`
     }
-    function drawQrOnCanvas(x, t, cx, topY, size = 160) {
+    function drawQrOnCanvas(x, t, cx, topY, size = 180) {
       if (!window.qrcode || !t) return 0;
       const q = qrcode(0, 'M'); q.addData(t); q.make();
-      const n = q.getModuleCount(), m = 2, cell = size / (n + m * 2), ox = cx - size / 2;
-      x.fillStyle = '#fff'; x.fillRect(ox, topY, size, size);
-      x.strokeStyle = '#e2e8f0'; x.lineWidth = 1; x.strokeRect(ox, topY, size, size);
-      x.fillStyle = '#000';
-      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) x.fillRect(ox + (c + m) * cell, topY + (r + m) * cell, Math.ceil(cell), Math.ceil(cell));
+      const n = q.getModuleCount(), m = 4, cell = size / (n + m * 2), ox = cx - size / 2;
+      x.fillStyle = '#ffffff'; x.fillRect(ox, topY, size, size);
+      x.strokeStyle = '#cbd5e1'; x.lineWidth = 1; x.strokeRect(ox, topY, size, size);
+      x.fillStyle = '#000000';
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (q.isDark(r, c)) {
+            const px = Math.floor(ox + (c + m) * cell);
+            const py = Math.floor(topY + (r + m) * cell);
+            const pw = Math.ceil(ox + (c + m + 1) * cell) - px;
+            const ph = Math.ceil(topY + (r + m + 1) * cell) - py;
+            x.fillRect(px, py, pw, ph);
+          }
+        }
+      }
       return size;
     }
     const kv = (a, b) => `<div class="flex justify-between gap-3 py-1 border-b text-sm"><span class="text-slate-500">${a}</span><b class="font-mono text-right break-all">${b}</b></div>`;
@@ -2357,11 +2456,20 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     //-> Function: syncNow()
     //-> Replays queued claims against Supabase, retains network-failed items in localStorage, then reloads and reports sync status.
     async function syncNow() {
-      if (!online()) return toast('Still offline. Reconnect to sync.', 1); const q = S.queue, keep = []; let ok = 0;
-      for (const x of q) { const { data: sd, error } = await sb.rpc('claim_portion', { p_cid: x.id, p_kg: x.kg }); if (!error) { ok++; if (x.pay && sd && sd.id) paySave(sd.id, x.pay); const lot = find(x.id); if (lot && typeof createVendorOrder === 'function') createVendorOrder(lot, x.kg, sd, x.pay, x.shipOpts) } else { toast(`${x.sid}: ${error.message}`, 1); if (/failed to fetch|network|load failed/i.test(error.message)) keep.push(x) } }
-      S.queue = keep; if (ok) note('Offline sync complete', ok + ' transaction(s) reconciled.', 1); toast(`${ok} of ${q.length} transaction(s) synced.`); await load(1); if (keep.length) toast('Network problem. Your saved claims are kept. Try again.', 1)
+      if (!online()) return toast('Still offline. Reconnect to sync.', 1);
+      const q = S.queue.slice(), keep = []; let ok = 0;
+      for (const x of q) {
+        try {
+          const ship = x.shipOpts || {}, pay = x.pay || {};
+          const { data, error } = await sb.rpc('claim_from_floor', { p_cid: x.id, p_kg: x.kg, p_method: pay.method || 'cash', p_fulfillment: ship.fulfillment === 'self_pickup' ? 'pickup' : 'delivery', p_market: ship.marketId || null, p_note: ship.stallNote || null });
+          if (error || !data || !data.success) { x.syncError = error && isNetErr(error) ? 'Connection interrupted. Check Orders before retrying to avoid a duplicate request.' : (error && error.message) || (data && data.message) || 'Could not sync. Check the order before trying again.'; keep.push(x); }
+          else ok++;
+        } catch (e) { x.syncError = 'Connection interrupted. Check Orders before retrying to avoid a duplicate request.'; keep.push(x); }
+      }
+      S.queue = keep; save(); if (ok) note('Offline sync complete', ok + ' claim request(s) confirmed.', 1);
+      toast(`${ok} of ${q.length} claim request(s) confirmed.`); await load(1); if (keep.length) toast('Some requests need attention. Review them in Offline Sync.', 1); render();
     }
-    function syncV() { return h1('Offline Sync Engine', 'Transactions made without signal are stored here until you sync.') + (S.queue.length ? S.queue.map((q, qi) => `<div class="card p-4 mb-3" tabindex="0" data-qi="${qi}" aria-label="Saved transaction. Press Delete to remove."><span class="badge b-pend">⏱️ Pending Local Sync</span> <button class="btn2 !py-1 !px-2 text-xs float-right" onclick="delQ(${qi})">🗑️ Remove</button><div class="font-mono text-sm mt-1">${q.sid} · ${q.kg} kg ${(find(q.id) || {}).name} · ${q.t}</div></div>`).join('') + `<button class="btn !w-full" data-k="sync" onclick="run(this,'Syncing…',syncNow)">Sync pending transactions</button>` : `<p class="text-slate-500">Nothing pending. Tap the status badge in the header to simulate offline.</p>`) }
+    function syncV() { return h1('Offline Sync', 'Saved requests are not confirmed until they sync. Check Orders after syncing.') + (S.queue.length ? S.queue.map((q, qi) => `<div class="card p-4 mb-3" tabindex="0" data-qi="${qi}"><span class="badge b-pend">${q.syncError ? 'Needs attention' : 'Saved on this device - not confirmed'}</span> <button class="btn2 !py-1 !px-2 text-xs float-right" onclick="delQ(${qi})">Remove</button><div class="font-mono text-sm mt-1">${esc(q.sid)} - ${esc(q.kg)} kg ${esc((find(q.id) || {}).name || q.id)} - ${esc(q.t)}</div>${q.syncError ? `<p class="text-sm text-red-700 mt-2">${esc(q.syncError)}</p>` : ''}</div>`).join('') + `<button class="btn !w-full" data-k="sync" onclick="run(this,'Syncing...',syncNow)">Sync pending requests</button>` : `<p class="text-slate-500">No requests are waiting to sync.</p>`) }
     const payRow = p => { const y = payOf(p) || {}, m = y.method; return `<div class="mt-1 text-sm flex flex-wrap items-center gap-x-2"><span class="text-xs font-mono text-slate-500 uppercase">Payment method</span><b>${m === 'cashless' ? '📱' : m === 'cash' ? '💵' : '❔'} ${payLbl(m)}</b>${y.ref ? `<span class="text-xs font-mono text-slate-500">· ${esc(y.ref)}</span>` : ''}</div>` };
     function passes() {
       const tot = S.passes.reduce((a, p) => a + p.total, 0), held = S.passes.filter(p => p.status === 'escrow'), br = S.role === 'broker', vd = S.role === 'vendor';
@@ -2701,7 +2809,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       ['Total payable', 'Kabuuang babayaran'], ['Commission (5%)', 'Komisyon (5%)'], ['Ice / handling', 'Yelo / paghawak'], ['Base fish price', 'Batayang presyo ng isda'], ['Port fee', 'Bayad sa pantalan'],
       ['Offline Sync Engine', 'Makina ng Offline Sync'], ['Transactions made without signal are stored here until you sync.', 'Ang mga transaksyong ginawa nang walang signal ay itatabi rito hanggang mag-sync ka.', 'Dito naka-save ang mga transaction na walang signal hanggang mag-sync ka.'],
       ['Stored locally', 'Nakatabi sa device'], ['Sync pending transactions', 'I-sync ang mga nakabinbing transaksyon', 'I-sync ang pending transactions'],
-      ['Nothing pending. Tap the status badge in the header to simulate offline.', 'Walang nakabinbin. Pindutin ang status badge sa itaas para subukan ang offline.', 'Walang pending. I-tap ang status badge sa header para i-test ang offline.'],
+      ['Nothing pending. Tap the status badge in the notification bar to simulate offline.', 'Walang nakabinbin. Pindutin ang status badge sa gilid para subukan ang offline.', 'Walang pending. I-tap ang status badge sa gilid para i-test ang offline.'],
       ['My Passes & Ledger', 'Aking mga Pass at Talaan'], ['Escrow held', 'Naka-hold ang escrow'], ['Released', 'Nailabas na'], ['Approve escrow release', 'Aprubahan ang paglabas ng escrow'],
       ['No passes yet. Claim a portion on the Fresh Catches Floor.', 'Wala pang pass. Kumuha ng bahagi sa Palengke ng Sariwang Huli.', 'Wala pang pass. Mag-claim ng portion sa Fresh Catches Floor.'],
       ['Dockside Intake & Inspection', 'Pagtanggap at Pagsusuri sa Pantalan'], ['Timbang. Suri. Tala. Physical checks first, verify after.', 'Timbangin. Suriin. Itala. Unahin ang pisikal na pagsusuri bago mag-verify.', 'Timbang. Suri. Tala. Physical check muna bago i-verify.'],
@@ -2862,7 +2970,29 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
     ['Starting bid is locked once bidding has started.', 'Naka-lock ang panimulang taya kapag nagsimula na ang pagtaya.', 'Locked na ang starting bid kapag nagsimula na ang bidding.'], ['Brokers only', 'Para lamang sa mga broker', 'Brokers lang'],
     ['Lot not open for bidding.', 'Hindi bukas sa pagtaya ang lote.', 'Hindi open for bidding ang lot.'], ['Auction closed.', 'Sarado na ang subasta.', 'Closed na ang auction.'], ['You already hold the top bid.', 'Hawak mo na ang pinakamataas na taya.', 'Hawak mo na ang top bid.'],
     ['Portions were already claimed at the listed price.', 'May mga bahagi nang kinuha sa nakalistang presyo.', 'May portions nang na-claim sa listed price.'], ['Bid is too low.', 'Masyadong mababa ang taya.', 'Masyadong mababa ang bid.'],
-    ['Auction in progress. Portions open when bidding closes.', 'Umiikot pa ang subasta. Bubukas ang mga bahagi kapag nagsara ang pagtaya.', 'Ongoing pa ang auction. Magbubukas ang portions kapag nag-close ang bidding.']].forEach(r => DT[r[0]] = r);
+    ['Auction in progress. Portions open when bidding closes.', 'Umiikot pa ang subasta. Bubukas ang mga bahagi kapag nagsara ang pagtaya.', 'Ongoing pa ang auction. Magbubukas ang portions kapag nag-close ang bidding.'],
+    ['Close', 'Isara', 'Close'],
+    ['Order ID', 'Order ID', 'Order ID'],
+    ['View Receipt', 'Tingnan ang Resibo', 'View Receipt'],
+    ['Download Receipt', 'I-download ang Resibo', 'Download Receipt'],
+    ['Print Receipt', 'I-print ang Resibo', 'Print Receipt'],
+    ['Digital Hand-off Receipt', 'Digital na Resibo ng Pag-abot', 'Digital Hand-off Receipt'],
+    ['Official Purchase Receipt', 'Opisyal na Resibo ng Pagbili', 'Official Purchase Receipt'],
+    ['Pier Hand-off QR', 'QR sa Pag-abot sa Pantalan', 'Pier Hand-off QR'],
+    ['Delivery QR Pass', 'QR Pass sa Paghatid', 'Delivery QR Pass'],
+    ['Order QR pass is not available for this order.', 'Hindi available ang QR pass para sa order na ito.', 'Hindi available ang QR pass para sa order na ito.'],
+    ['Show this QR code for verification at hand-off or delivery.', 'Ipakita ang QR code na ito para sa beripikasyon sa pag-abot o paghatid.', 'Ipakita ang QR code na ito para sa verification sa hand-off o delivery.'],
+    ['Order Receipt', 'Resibo ng Order', 'Order Receipt'],
+    ['Batch / Species', 'Batch / Uri ng Isda', 'Batch / Species'],
+    ['Tubs / Weight', 'Bañera / Timbang', 'Tubs / Weight'],
+    ['Destination', 'Destinasyon', 'Destination'],
+    ['Timestamp', 'Oras at Petsa', 'Timestamp'],
+    ['Escrow Status', 'Katayuan ng Escrow', 'Escrow Status'],
+    ['Agreed Total', 'Napagkasunduang Kabuuan', 'Agreed Total'],
+    ['Batch', 'Batch', 'Batch'],
+    ['Weight', 'Timbang', 'Weight'],
+    ['Agreed Price', 'Napagkasunduang Presyo', 'Agreed Price'],
+    ['Location', 'Lokasyon', 'Location']].forEach(r => DT[r[0]] = r);
     [['Instant Pricing for Fresh Catches', 'Agarang Presyo para sa Sariwang Huli', 'Instant na Presyo para sa Fresh Catches'], ['Sign In', 'Mag-sign in', 'Mag-sign in'], ['Sold Out', 'Naubos', 'Sold Out'], ['Closed', 'Sarado', 'Closed'], ['Search catches', 'Maghanap ng huli', 'Search catches'], ['No catches match your search.', 'Walang huling tumutugma sa hinahanap mo.', 'Walang catch na match sa search mo.'], ['Fresh Catches', 'Sariwang Huli', 'Fresh Catches']].forEach(r => { if (!DT[r[0]]) DT[r[0]] = r });
 
     const RULES = [[/^Step (\d+) of (\d+)$/, 'Hakbang $1 ng $2'], [/^(\d+) transaction\(s\) reconciled\.$/, '$1 transaksyon ang na-reconcile', '$1 transactions na-reconcile'],
@@ -2972,13 +3102,13 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       if (changed) ordWrite(list)
     }
     const MARKETS = {
-      nepo: { id: 'nepo', name: 'Nepo Market (Malabon)', city: 'Malabon City', km: 4.8, baseMin: 18, feeBase: 120 },
-      malabon: { id: 'malabon', name: 'Malabon Central Market', city: 'Malabon City', km: 5.4, baseMin: 20, feeBase: 130 },
-      navotas: { id: 'navotas', name: 'Navotas Agora / Public Market', city: 'Navotas City', km: 3.1, baseMin: 14, feeBase: 95 },
-      agora: { id: 'agora', name: 'Agora Market (San Juan)', city: 'San Juan City', km: 15.6, baseMin: 46, feeBase: 260 },
-      farmers: { id: 'farmers', name: 'Farmers Market (Cubao)', city: 'Quezon City', km: 17.2, baseMin: 52, feeBase: 290 },
-      munoz: { id: 'munoz', name: 'Muñoz Market (EDSA)', city: 'Quezon City', km: 11.4, baseMin: 35, feeBase: 210 }
+      tres: { id: 'tres', name: 'Tres Talipapa - Brgy. San Jose', city: 'Navotas City' },
+      miguelisa: { id: 'miguelisa', name: 'Miguelisa Market Stalls / Oliveros St. Talipapa - Brgy. Tangos', city: 'Navotas City' },
+      tanza: { id: 'tanza', name: 'Tanza Barangay Talipapas - Tanza 1 and 2', city: 'Navotas City' },
+      dagat: { id: 'dagat', name: 'Dagat-Dagatan Barangay Talipapas - NBBS / Kaunlaran', city: 'Navotas City' }
     };
+    // Older orders retain their original destination labels.
+    const LEGACY_MARKETS = { nepo: 'Nepo Market (Malabon)', malabon: 'Malabon Central Market', navotas: 'Navotas Agora / Public Market', agora: 'Agora Market (San Juan)', farmers: 'Farmers Market (Cubao)', munoz: 'Munoz Market (EDSA)' };
     const FLEET_TYPES = {
       'L300 Van': { label: 'L300 Van', speedFactor: 1.0, feeMult: 1.0, cold: 'Iced Boxed' },
       'Insulated Chilled Truck': { label: 'Insulated Chilled Truck', speedFactor: 1.12, feeMult: 1.25, cold: 'Chilled 0–4°C' },
@@ -2995,12 +3125,22 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
     const orderQrPayload = o => (o && o.srv) ? (o.qrPayload || 'DEAL2|NOT-YOURS') : (o && o.kind === 'vendor_sale' && o.passId && o.passToken)
       ? `DEAL1|${o.passId}|${o.passToken}`
       : `ORDQR1|${o.id}|${o.cid}|${orderQrToken(o)}`;
+    const validOrderQr = o => {
+      if (!o || o.status === 'Cancelled' || o.status === 'Rejected') return '';
+      if (o.srv && !o.qrPayload) return '';
+      return orderQrPayload(o);
+    };
+    const canShowOrderQr = o => {
+      if (!o) return false;
+      const live = o.status === 'Pending Acceptance' || o.status === 'Pending Approval' || o.status === 'Accepted' || o.status === 'In Transit';
+      if (!live) return false;
+      if (o.srv) return !!o.qrPayload;
+      return (o.kind === 'pier_acquisition' && S.role === 'broker') || (o.kind === 'vendor_sale' && S.role === 'vendor');
+    };
     addEventListener('storage', e => { if (e.key === ORD_V + S.uid && S.user) render() });
     function calcMarketRoute(marketId, vehicleType = 'L300 Van', kg = 10) {
-      const m = MARKETS[marketId] || MARKETS.nepo, f = FLEET_TYPES[vehicleType] || FLEET_TYPES['L300 Van'];
-      const etaMinutes = Math.max(10, Math.round(m.baseMin / f.speedFactor));
-      const transportFee = Math.round((m.feeBase + (+kg || 0) * 1.5) * f.feeMult);
-      return { market: m.name, city: m.city, km: m.km, etaMinutes, etaText: `${etaMinutes} mins`, transportFee, coldChain: f.cold };
+      const m = MARKETS[marketId], f = FLEET_TYPES[vehicleType] || FLEET_TYPES['L300 Van'];
+      return { market: m ? m.name : (LEGACY_MARKETS[marketId] || 'Destination unavailable'), city: m ? m.city : '', coldChain: f.cold };
     }
     const isBidRejected = cid => false && ordRead().some(o => o.kind === 'pier_acquisition' && o.cid === cid && o.status === 'Rejected');
     const ordClearedAt = () => { try { return +(localStorage.getItem('deal-ord-cleared') || 0) } catch (e) { return 0 } };
@@ -3084,8 +3224,8 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       TTS.speak(msg, 'order-placed');
     }
     function createVendorOrder(lot, kg, passData, pay, opts) {
-      const o = opts || { fulfillment: 'broker_delivery', marketId: 'nepo', stallNote: '' };
-      const isDel = o.fulfillment !== 'self_pickup', mk = MARKETS[o.marketId] || MARKETS.nepo, rt = isDel ? calcMarketRoute(mk.id, 'L300 Van', kg) : null;
+      const o = opts || { fulfillment: 'broker_delivery', marketId: 'tres', stallNote: '' };
+      const isDel = o.fulfillment !== 'self_pickup', mk = MARKETS[o.marketId] || MARKETS.tres, rt = isDel ? calcMarketRoute(mk.id, 'L300 Van', kg) : null;
       const now = new Date().toISOString();
       const rec = {
         id: 'ORD-' + Date.now().toString(36).slice(-5).toUpperCase(),
@@ -3168,7 +3308,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       const rt = calcMarketRoute(o.marketId, vehicleType, o.kg);
       o.vehicle = { driverName: esc(driverName), vehicleType, plateNo: esc(plateNo), contactNo: esc(contactNo) };
       o.route = rt; o.status = 'In Transit'; o.updatedAt = new Date().toISOString(); ordWrite(list);
-      noteFor(['broker', 'vendor'], 'Order In Transit to Market', `${o.cid} dispatched via ${vehicleType} (${plateNo}) to ${o.marketName}. ETA ${rt.etaText}.`);
+      noteFor(['broker', 'vendor'], 'Order In Transit to Market', `${o.cid} dispatched via ${vehicleType} (${plateNo}) to ${o.marketName}. Please coordinate delivery details.`);
       render();
     }
     let ORD_SC = null, ORD_SC_BUSY = false, ORD_SC_CTX = null;
@@ -3299,29 +3439,76 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       } finally { CANCELLING.delete(id) }
     }
     function openOrderQrModal(orderId) {
-      if (S.role === 'broker') return toast('Show your hand-off QR (below) to the Pier Checker at the dock.', 1);
       const o = ordRead().find(x => x.id === orderId);
-      if (!o) return toast('Order QR pass not found.', 1);
+      const qrText = validOrderQr(o);
+      if (!o || !qrText) return toast('Order QR pass is not available for this order.', 1);
       closeOrderQrModal();
       const d = document.createElement('div');
       d.id = 'ordQrLayer';
       d.className = 'fixed inset-0 bg-[#0B0E17]/75 flex items-center justify-center p-4 z-50 overflow-y-auto';
-      d.innerHTML = `<div class="card w-full max-w-sm p-5 text-center" role="dialog" aria-modal="true"><div class="flex justify-between items-center mb-2"><span class="badge bg-teal-100 text-teal-800">${o.kind === 'pier_acquisition' ? 'Pier Hand-off QR' : 'Delivery QR Pass'}</span><button onclick="closeOrderQrModal()" aria-label="Close" class="text-2xl leading-none px-1">×</button></div><h2 class="font-mono font-bold text-lg">${esc(o.catchName)}</h2><div class="qr-frame rounded-xl p-2.5 mx-auto my-3 max-w-[240px] border border-slate-200 bg-white">${qrSvg(orderQrPayload(o))}</div><div class="text-left text-xs space-y-1">${kv('Order ID', esc(o.id))}${kv('Batch', esc(o.cid))}${kv('Weight', o.kg + ' kg')}${kv('Agreed Price', fmt(o.total))}${kv('Location', esc(o.kind === 'pier_acquisition' ? o.pierLocation : o.marketName))}</div><div class="flex flex-col sm:flex-row gap-2 mt-4"><button class="btn2 flex-1" onclick="dlOrderReceipt('${esc(o.id)}')">📄 Download Receipt</button><button class="btn flex-1" onclick="closeOrderQrModal()">Done</button></div></div>`;
-      document.body.append(d); trDom(d);
+      d.setAttribute('onclick', 'if(event.target===this)closeOrderQrModal()');
+      d.innerHTML = `<div class="card w-full max-w-sm p-5 text-center my-auto" role="dialog" aria-modal="true" aria-labelledby="ordQrTitle"><div class="flex justify-between items-center mb-2"><span class="badge bg-teal-100 text-teal-800">${o.kind === 'pier_acquisition' ? 'Pier Hand-off QR' : 'Delivery QR Pass'}</span><button type="button" onclick="closeOrderQrModal()" aria-label="Close" class="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 text-2xl leading-none">×</button></div><h2 id="ordQrTitle" class="font-mono font-bold text-lg">${esc(o.catchName)}</h2><div class="font-mono text-xs text-slate-500 mt-0.5"><span>Order ID</span>: <b class="text-slate-700">${esc(o.id)}</b></div><div class="qr-frame qr-white-box rounded-xl p-3.5 mx-auto my-3 w-[240px] max-w-full border border-slate-200 bg-white shadow-sm" style="background:#ffffff;color:#000000">${qrSvg(qrText)}</div><p class="text-xs text-slate-500 mb-3">Show this QR code for verification at hand-off or delivery.</p><div class="text-left text-xs space-y-1">${kv('Order ID', esc(o.id))}${kv('Batch', esc(o.cid))}${kv('Weight', o.kg + ' kg')}${kv('Agreed Price', fmt(o.total))}${kv('Location', esc(o.kind === 'pier_acquisition' ? o.pierLocation : o.marketName))}</div><div class="flex flex-col sm:flex-row gap-2 mt-4"><button type="button" class="btn2 flex-1 min-h-[44px] !max-h-none" onclick="openOrderReceiptModal('${esc(o.id)}')">📄 View Receipt</button><button type="button" class="btn2 flex-1 min-h-[44px] !max-h-none" onclick="dlOrderReceipt('${esc(o.id)}')">⬇️ Download Receipt</button></div><button type="button" class="btn !w-full min-h-[44px] !max-h-none mt-2" onclick="closeOrderQrModal()">Close</button></div>`;
+      document.body.append(d); iconify(d); trDom(d);
+      const clsBtn = d.querySelector('button.btn');
+      if (clsBtn) clsBtn.focus({ preventScroll: true });
     }
     function closeOrderQrModal() { const d = $('#ordQrLayer'); if (d) d.remove(); }
+    function openOrderReceiptModal(orderId) {
+      const o = ordRead().find(x => x.id === orderId);
+      if (!o) return toast('Order record not found.', 1);
+      closeOrderReceiptModal();
+      const qrText = validOrderQr(o);
+      const tubsCount = o.tubs || Math.max(1, Math.ceil((+o.kg || 1) / 25));
+      const dest = o.kind === 'pier_acquisition' ? o.pierLocation : o.marketName;
+      const tsStr = new Date(o.updatedAt || o.createdAt).toLocaleString();
+      const escrowStr = o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held');
+      const d = document.createElement('div');
+      d.id = 'ordReceiptLayer';
+      d.className = 'fixed inset-0 bg-[#0B0E17]/75 flex items-center justify-center p-4 z-50 overflow-y-auto';
+      d.setAttribute('onclick', 'if(event.target===this)closeOrderReceiptModal()');
+      d.innerHTML = `<div class="card w-full max-w-md p-5 text-center my-auto" role="dialog" aria-modal="true" aria-labelledby="ordRecTitle">
+        <div class="flex justify-between items-center mb-2 no-print"><span class="badge bg-teal-100 text-teal-800">Order Receipt</span><button type="button" onclick="closeOrderReceiptModal()" aria-label="Close" class="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 text-2xl leading-none">×</button></div>
+        <div class="font-mono font-bold text-xl text-[#0B4A5D]">DEAL Navotas</div>
+        <h2 id="ordRecTitle" class="text-sm text-slate-500 mt-0.5">${o.kind === 'pier_acquisition' ? 'Digital Hand-off Receipt' : 'Official Purchase Receipt'}</h2>
+        <div class="text-left mt-3 border-t border-dashed border-slate-300 pt-2">
+          ${kv('Order ID', esc(o.id + (o.passId ? ' · ' + o.passId : '')))}
+          ${kv('Batch / Species', esc(o.cid + ' · ' + o.catchName))}
+          ${kv('Tubs / Weight', esc(tubsCount + ' tub(s) · ' + o.kg + ' kg'))}
+          ${kv('Destination', esc(dest))}
+          ${kv('Timestamp', esc(tsStr))}
+          ${kv('Escrow Status', esc(escrowStr))}
+        </div>
+        <div class="flex justify-between items-center py-3 mt-1 border-b border-dashed border-slate-300"><span class="font-bold text-base">Agreed Total</span><span class="font-mono font-bold text-xl text-emerald-600">${'₱' + fmt(o.total).replace(/^₱/, '')}</span></div>
+        ${qrText ? `<div class="mt-4"><div class="qr-frame qr-white-box rounded-xl p-3 mx-auto w-[220px] max-w-full border border-slate-300 bg-white shadow-sm" style="background:#ffffff;color:#000000">${qrSvg(qrText)}</div><div class="font-mono text-xs font-bold text-[#0B4A5D] mt-2">SCAN QR TO VERIFY · ${esc(o.passId || o.id)}</div></div>` : `<p class="mt-3 text-xs text-slate-500">Order QR pass is not available for this order.</p>`}
+        <div class="flex flex-col sm:flex-row gap-2 mt-4 no-print">
+          <button type="button" class="btn flex-1 min-h-[44px] !max-h-none" onclick="dlOrderReceipt('${esc(o.id)}')">⬇️ Download Receipt</button>
+          <button type="button" class="btn2 flex-1 min-h-[44px] !max-h-none" onclick="printOrderReceipt()">🖨️ Print Receipt</button>
+        </div>
+        <button type="button" class="btn2 !w-full min-h-[44px] !max-h-none mt-2 no-print" onclick="closeOrderReceiptModal()">Close</button>
+      </div>`;
+      document.body.append(d); iconify(d); trDom(d);
+    }
+    function closeOrderReceiptModal() { document.body.classList.remove('printing-receipt'); const d = $('#ordReceiptLayer'); if (d) d.remove(); }
+    function printOrderReceipt() {
+      document.body.classList.add('printing-receipt');
+      const cleanup = () => document.body.classList.remove('printing-receipt');
+      addEventListener('afterprint', cleanup, { once: true });
+      try { window.print(); } catch (e) { cleanup(); }
+      setTimeout(cleanup, 1500);
+    }
     function dlOrderReceipt(orderId) {
       const o = ordRead().find(x => x.id === orderId);
       if (!o) return toast('Order record not found.', 1);
-      const qrText = S.role === 'broker' ? '' : orderQrPayload(o);
-      const S2 = 2, W = 640, H = qrText ? 650 : 440, cv = document.createElement('canvas');
+      const qrText = validOrderQr(o);
+      const S2 = 2, W = 640, H = qrText ? 688 : 440, cv = document.createElement('canvas');
       cv.width = W * S2; cv.height = H * S2;
-      const x = cv.getContext('2d'); x.scale(S2, S2); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+      const x = cv.getContext('2d'); x.scale(S2, S2); x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
       const SANS = '"Segoe UI",Roboto,Arial,sans-serif', MONO = '"Courier New",monospace'; let y = 46;
       x.fillStyle = '#0B4A5D'; x.font = 'bold 26px ' + SANS; x.textAlign = 'center'; x.fillText('DEAL Navotas', W / 2, y); y += 24;
       x.font = '14px ' + SANS; x.fillStyle = '#475569'; x.fillText(o.kind === 'pier_acquisition' ? 'Digital Hand-off Receipt' : 'Official Purchase Receipt', W / 2, y); y += 22;
       const line = () => { x.strokeStyle = '#cbd5e1'; x.setLineDash([5, 4]); x.beginPath(); x.moveTo(32, y); x.lineTo(W - 32, y); x.stroke(); x.setLineDash([]); y += 24 };
-      const row = (l, v) => { x.textAlign = 'left'; x.fillStyle = '#64748b'; x.font = '14px ' + SANS; x.fillText(l, 32, y); x.textAlign = 'right'; x.fillStyle = '#0B0E17'; x.font = 'bold 14px ' + MONO; x.fillText(String(v), W - 32, y); y += 28 };
+      const fit = (s, w) => { s = String(s); while (s.length > 1 && x.measureText(s).width > w) s = s.slice(0, -2) + '…'; return s };
+      const row = (l, v) => { x.textAlign = 'left'; x.fillStyle = '#64748b'; x.font = '14px ' + SANS; x.fillText(l, 32, y); x.textAlign = 'right'; x.fillStyle = '#0B0E17'; x.font = 'bold 14px ' + MONO; x.fillText(fit(v, W - 64 - 190), W - 32, y); y += 28 };
       line();
       row('Order ID', o.id + (o.passId ? ' · ' + o.passId : ''));
       row('Batch / Species', o.cid + ' · ' + o.catchName);
@@ -3332,9 +3519,9 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       line();
       x.textAlign = 'left'; x.fillStyle = '#0B0E17'; x.font = 'bold 18px ' + SANS; x.fillText('Agreed Total', 32, y + 4);
       x.textAlign = 'right'; x.fillStyle = '#059669'; x.font = 'bold 22px ' + MONO; x.fillText('₱' + fmt(o.total).replace(/^₱/, ''), W - 32, y + 4);
-      if (qrText && drawQrOnCanvas(x, qrText, W / 2, y + 28, 168)) {
+      if (qrText && drawQrOnCanvas(x, qrText, W / 2, y + 28, 192)) {
         x.textAlign = 'center'; x.fillStyle = '#0B4A5D'; x.font = 'bold 12px ' + MONO;
-        x.fillText('SCAN QR TO VERIFY · ' + (o.passId || o.id), W / 2, y + 214);
+        x.fillText('SCAN QR TO VERIFY · ' + (o.passId || o.id), W / 2, y + 240);
       }
       cv.toBlob(bl => {
         if (!bl) return toast('Could not generate receipt.', 1);
@@ -3353,7 +3540,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
     }
     function ordersV() {
       const all = ordRead(), r = S.role;
-      let scoped = all.filter(o => r === 'checker' ? o.kind === 'pier_acquisition' : r === 'vendor' ? o.kind === 'vendor_sale' : true);
+      let scoped = all.filter(o => !(S.hiddenOrders || []).includes(o.id)).filter(o => r === 'checker' ? o.kind === 'pier_acquisition' : r === 'vendor' ? o.kind === 'vendor_sale' : true);
       const tabMatch = {
         all: () => true,
         receive: o => r === 'checker' ? o.status === 'Accepted' : r === 'vendor' ? (o.status === 'Accepted' || o.status === 'In Transit') : (o.status === 'Accepted' || o.status === 'In Transit'),
@@ -3363,55 +3550,62 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       const list = scoped.filter(tabMatch[ORD_TAB] || tabMatch.all);
       const subTabs = [['all', `All Orders (${counts.all})`], ['receive', `To Receive / Passes (${counts.receive})`], ['rate', `To Rate (${counts.rate})`]];
       return h1('Orders', 'Manage pier acquisitions, market sales, QR pass verification, live chat, and ratings.')
-        + `<div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-4"><div class="flex flex-wrap gap-2" role="tablist" aria-label="Order sub-tabs">${subTabs.map(([k, l]) => `<button role="tab" aria-selected="${ORD_TAB === k}" class="pill border ${ORD_TAB === k ? 'on' : ''}" onclick="ORD_TAB='${k}';playAudio('nav');render()">${l}</button>`).join('')}</div>${all.length ? `<button type="button" class="btn2 !py-2 !px-3 text-xs !border-red-300 text-red-700" onclick="clearAllOrders()">🗑️ Clear Orders</button>` : ''}</div>`
+        + `<div class="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-4"><div class="flex flex-wrap gap-2" role="tablist" aria-label="Order sub-tabs">${subTabs.map(([k, l]) => `<button role="tab" aria-selected="${ORD_TAB === k}" class="pill border ${ORD_TAB === k ? 'on' : ''}" onclick="ORD_TAB='${k}';playAudio('nav');render()">${l}</button>`).join('')}</div>${scoped.some(o => o.status === 'Delivered' || o.status === 'Rejected') ? `<button type="button" class="btn2 !py-2 !px-3 text-xs !border-red-300 text-red-700" onclick="clearAllOrders()">🗑️ Clear Orders</button>` : ''}</div>`
         + (list.length ? list.map(o => {
           const isAcq = o.kind === 'pier_acquisition';
           const badgeRow = `${r === 'broker' ? kindBadge(o.kind) + ' ' : ''}${ordBadge(o.status)}${orderTracker(o)}`;
           const tubsCount = o.tubs || Math.max(1, Math.ceil((+o.kg || 1) / 25));
           const tsStr = new Date(o.updatedAt || o.createdAt).toLocaleString();
           let body = '', actions = '', recvLayout = '', chat = '', rate = '';
+          const hasQrBtn = canShowOrderQr(o);
           if (isAcq) {
             body = `<div class="text-xs text-slate-600 mt-1">Pier Dock: <b>${esc(o.pierLocation)}</b> · Broker: <b>${esc(o.brokerIdent)}</b> · Total: <b class="font-mono">${fmt(o.total)}</b> · Escrow: <b>${esc(o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held'))}</b></div>`;
             if (o.status === 'Cancelled') {
               body += `<div class="mt-3 rounded-lg border border-red-300 bg-red-50 text-red-800 p-3 text-sm font-semibold" role="status">Order Cancelled. The Broker cancelled this order${o.updatedAt ? ' on ' + esc(new Date(o.updatedAt).toLocaleString()) : ''}. Inspection and check-in are disabled.</div>`;
-              if (r === 'checker') actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1" disabled aria-disabled="true">Accept Bid</button><button class="btn2 flex-1" disabled aria-disabled="true">Scan QR Release Pass</button></div>`;
+              if (r === 'checker') actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1 min-h-[44px]" disabled aria-disabled="true">Accept Bid</button><button class="btn2 flex-1 min-h-[44px]" disabled aria-disabled="true">Scan QR Release Pass</button></div>`;
             }
             if (ORD_TAB === 'all' && o.status === 'Pending Acceptance') {
               if (r === 'checker') {
-                actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1" onclick="acceptPierBid('${o.id}')">✓ Accept Bid</button><button class="btn2 flex-1 !border-red-300 text-red-700" onclick="rejectPierBid('${o.id}')">✕ Reject Bid</button></div>`;
+                actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1 min-h-[44px]" onclick="acceptPierBid('${o.id}')">✓ Accept Bid</button><button class="btn2 flex-1 min-h-[44px] !border-red-300 text-red-700" onclick="rejectPierBid('${o.id}')">✕ Reject Bid</button></div>`;
               } else if (r === 'broker') {
-                actions = `<div class="mt-3"><button class="btn2 !border-red-300 text-red-700" onclick="cancelOrder('${o.id}')">✕ Cancel Order</button></div>`;
+                actions = `<div class="flex flex-wrap gap-2 mt-3">${hasQrBtn ? `<button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="openOrderQrModal('${esc(o.id)}')">Show QR Code</button>` : ''}<button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="openOrderReceiptModal('${esc(o.id)}')">📄 View Receipt</button><button type="button" class="btn2 min-h-[44px] !max-h-none !border-red-300 text-red-700" onclick="cancelOrder('${o.id}')">✕ Cancel Order</button></div>`;
               }
             }
             if ((ORD_TAB === 'receive' || ORD_TAB === 'all') && o.status === 'Accepted') {
               const contactHtml = r === 'checker' ? contactLinks(o.brokerPhone, 'Broker Contact') : contactLinks(o.checkerPhone, 'Pier Checker Contact');
               const leftCol = `<div class="space-y-1 text-xs text-slate-700"><div class="font-mono font-semibold text-slate-500 uppercase">Receiving Area · Passes & Ledges</div><div><b>Species:</b> ${esc(o.catchName)} · <b>Tubs:</b> ${tubsCount} · <b>Total Weight:</b> ${o.kg} kg</div><div><b>Agreed Price:</b> <span class="font-mono font-bold text-[#0B4A5D]">${fmt(o.total)}</span> · <b>Dock:</b> ${esc(o.pierLocation)}</div><div><b>Timestamp:</b> ${esc(tsStr)}</div>${contactHtml}</div>`;
-              const rightCol = `<div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52">${r === 'broker' ? '<p class="text-xs text-slate-500">Show your hand-off QR (below) to the Pier Checker at the dock.</p>' : `<button class="btn" onclick="openOrderScanner('${o.id}','pier')">📷 Scan QR Release Pass</button>`}<button class="btn2" onclick="dlOrderReceipt('${o.id}')">📄 Download Receipt</button></div>`;
+              const rightCol = `<div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52">${r === 'broker' ? (hasQrBtn ? `<button type="button" class="btn min-h-[44px] !max-h-none" onclick="openOrderQrModal('${esc(o.id)}')">Show QR Code</button>` : '') : `<button class="btn min-h-[44px] !max-h-none" onclick="openOrderScanner('${o.id}','pier')">📷 Scan QR Release Pass</button>`}<button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="openOrderReceiptModal('${esc(o.id)}')">📄 View Receipt</button><button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="dlOrderReceipt('${esc(o.id)}')">⬇️ Download Receipt</button></div>`;
               recvLayout = `<div class="mt-3 p-3 rounded-xl border border-teal-200 bg-teal-50/50 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">${leftCol}${rightCol}</div>`;
               if (ORD_TAB === 'receive') chat = renderChatBox(o, 'Pier Checker ↔ Broker Chat');
+            }
+            if (o.status === 'Delivered') {
+              actions = `<div class="flex flex-wrap gap-2 mt-3"><button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="openOrderReceiptModal('${esc(o.id)}')">📄 View Receipt</button><button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="dlOrderReceipt('${esc(o.id)}')">⬇️ Download Receipt</button></div>`;
             }
             if (ORD_TAB === 'rate' && o.status === 'Delivered') {
               rate = renderRatingForm(o, r, r === 'checker' ? 'Consignee Broker' : 'Pier Checker (Quality & Dock Speed)');
             }
           } else {
             body = `<div class="text-xs text-slate-600 mt-1">Destination: <b>${esc(o.marketName)}</b>${o.stallNote ? ' (' + esc(o.stallNote) + ')' : ''} · Fulfillment: <b>${o.fulfillment === 'broker_delivery' ? 'Broker Transport' : 'Pier Self-Pickup'}</b> · Total: <b class="font-mono">${fmt(o.total)}</b> · Escrow: <b>${esc(o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held'))}</b></div>`;
-            if (o.vehicle) body += `<div class="rounded-lg bg-slate-50 border border-slate-200 p-2.5 mt-2 text-xs"><b>Vehicle:</b> ${esc(o.vehicle.vehicleType)} (${esc(o.vehicle.plateNo)}) · <b>Driver:</b> ${esc(o.vehicle.driverName)} (${esc(o.vehicle.contactNo)})${o.route ? ` · <b>ETA:</b> ${esc(o.route.etaText)}` : ''}</div>`;
+            if (o.vehicle) body += `<div class="rounded-lg bg-slate-50 border border-slate-200 p-2.5 mt-2 text-xs"><b>Vehicle:</b> ${esc(o.vehicle.vehicleType)} (${esc(o.vehicle.plateNo)}) · <b>Driver:</b> ${esc(o.vehicle.driverName)} (${esc(o.vehicle.contactNo)})</div>`;
             if (ORD_TAB === 'all' && o.status === 'Pending Approval') {
               if (r === 'broker') {
-                actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1" onclick="acceptVendorOrder('${o.id}')">✓ Accept Order</button><button class="btn2 flex-1 !border-red-300 text-red-700" onclick="rejectVendorOrder('${o.id}')">✕ Reject Order</button></div>`;
+                actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1 min-h-[44px] !max-h-none" onclick="acceptVendorOrder('${o.id}')">✓ Accept Order</button><button class="btn2 flex-1 min-h-[44px] !max-h-none !border-red-300 text-red-700" onclick="rejectVendorOrder('${o.id}')">✕ Reject Order</button></div>`;
               } else if (r === 'vendor') {
-                actions = `<div class="mt-3"><button class="btn2 !border-red-300 text-red-700" onclick="cancelOrder('${o.id}')">✕ Cancel Order</button></div>`;
+                actions = `<div class="flex flex-wrap gap-2 mt-3">${hasQrBtn ? `<button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="openOrderQrModal('${esc(o.id)}')">Show QR Code</button>` : ''}<button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="openOrderReceiptModal('${esc(o.id)}')">📄 View Receipt</button><button type="button" class="btn2 min-h-[44px] !max-h-none !border-red-300 text-red-700" onclick="cancelOrder('${o.id}')">✕ Cancel Order</button></div>`;
               }
             }
             if ((ORD_TAB === 'receive' || ORD_TAB === 'all') && (o.status === 'Accepted' || o.status === 'In Transit')) {
               const contactHtml = r === 'broker' ? contactLinks(o.vendorPhone, 'Micro-Vendor Contact') : contactLinks(o.brokerPhone, 'Broker Contact');
               const leftCol = `<div class="space-y-1 text-xs text-slate-700"><div class="font-mono font-semibold text-slate-500 uppercase">Receiving Area · Passes & Ledges</div><div><b>Species:</b> ${esc(o.catchName)} · <b>Tubs:</b> ${tubsCount} · <b>Total Weight:</b> ${o.kg} kg</div><div><b>Agreed Price:</b> <span class="font-mono font-bold text-[#0B4A5D]">${fmt(o.total)}</span> · <b>Market:</b> ${esc(o.marketName)}</div><div><b>Timestamp:</b> ${esc(tsStr)}</div>${contactHtml}</div>`;
-              const rightCol = `<div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52">${r === 'vendor' ? `<button class="btn" onclick="openOrderQrModal('${o.id}')">🎟️ View QR Code</button>` : `<button class="btn" onclick="openOrderScanner('${o.id}','market')">📷 Scan Market Delivery QR</button>`}<button class="btn2" onclick="dlOrderReceipt('${o.id}')">📄 Download Receipt</button></div>`;
+              const rightCol = `<div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52">${r === 'vendor' ? (hasQrBtn ? `<button type="button" class="btn min-h-[44px] !max-h-none" onclick="openOrderQrModal('${esc(o.id)}')">Show QR Code</button>` : '') : `<button class="btn min-h-[44px] !max-h-none" onclick="openOrderScanner('${o.id}','market')">📷 Scan Market Delivery QR</button>`}<button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="openOrderReceiptModal('${esc(o.id)}')">📄 View Receipt</button><button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="dlOrderReceipt('${esc(o.id)}')">⬇️ Download Receipt</button></div>`;
               recvLayout = `<div class="mt-3 p-3 rounded-xl border border-teal-200 bg-teal-50/50 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">${leftCol}${rightCol}</div>`;
               if (ORD_TAB === 'receive' && r === 'broker' && o.status === 'Accepted' && o.fulfillment === 'broker_delivery') {
                 actions = `<div class="mt-3 p-3 rounded-xl border border-amber-300 bg-amber-50"><div class="text-xs font-mono font-semibold text-amber-900 uppercase mb-2">Assign Broker Transport Fleet</div><div class="grid sm:grid-cols-2 gap-2"><input id="drv-${o.id}" class="inp" placeholder="Driver Name"><select id="veh-${o.id}" class="inp">${Object.keys(FLEET_TYPES).map(v => `<option>${v}</option>`).join('')}</select><input id="plt-${o.id}" class="inp" placeholder="Plate # / Vehicle ID"><input id="cnt-${o.id}" class="inp" placeholder="Driver Contact #"></div><button class="btn !w-full mt-2" onclick="dispatchVendorOrder('${o.id}')">🚚 Assign Vehicle & Mark In Transit</button></div>`;
               }
               if (ORD_TAB === 'receive') chat = renderChatBox(o, 'Broker ↔ Micro-Vendor Chat');
+            }
+            if (o.status === 'Delivered') {
+              actions = `<div class="flex flex-wrap gap-2 mt-3"><button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="openOrderReceiptModal('${esc(o.id)}')">📄 View Receipt</button><button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="dlOrderReceipt('${esc(o.id)}')">⬇️ Download Receipt</button></div>`;
             }
             if (ORD_TAB === 'rate' && o.status === 'Delivered') {
               rate = renderRatingForm(o, r, r === 'vendor' ? 'Broker & Delivery Service' : 'Micro-Vendor');
@@ -3441,7 +3635,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       im.onerror = () => { toast('This photo could not be previewed. Use a JPG or PNG image.', 1); im.classList.add('hidden'); evChk() };
       im.onload = () => { im.classList.remove('hidden'); if (ck) ck.classList.remove('hidden'); evChk() }; im.src = URL.createObjectURL(f)
     }
-    function evChk() { if (!$('#evp0')) return; const ok = [0, 1, 2].every(i => !$('#evp' + i).classList.contains('hidden')); document.querySelectorAll('[data-k=log]').forEach(b => { if (!BUSY.has(b.dataset.k)) { b.disabled = !ok; b.title = ok ? '' : tr('Add all three photos (front, middle, bottom) first.') } }) }
+    function evChk() { if (!$('#evp0')) return; const ok = [0, 1, 2].every(i => !$('#evp' + i).classList.contains('hidden')); document.querySelectorAll('[data-k=log]').forEach(b => { if (!BUSY.has(b.dataset.k)) { b.disabled = !ok; let hint = b.parentElement.querySelector('[data-photo-hint]'); if (!hint) { hint = document.createElement('p'); hint.dataset.photoHint = '1'; hint.className = 'text-sm text-slate-700 mt-2'; b.insertAdjacentElement('beforebegin', hint); } hint.textContent = ok ? '' : tr('Add all three photos (front, middle, bottom) first.'); } }) }
     // ---> notifications and sidebar menu <---
     //-> Function: note(title, body, quiet)
     //-> Adds a notification to in-memory state, caps history at 40, updates the unread count, and refreshes an open panel.
@@ -3588,7 +3782,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       RO = new IntersectionObserver(es => { es.filter(e => e.isIntersecting).forEach((e, i) => { RO.unobserve(e.target); REV.add(+e.target.dataset.i); setTimeout(() => e.target.classList.add('in'), i * 120) }) }, { threshold: .12 });
       els.forEach(e => { if (!e.classList.contains('in')) RO.observe(e) })
     }
-    const topDlg = () => { const d = document.querySelectorAll('[role=dialog]'); return d[d.length - 1] };
+    const topDlg = () => { const d = document.querySelectorAll('[role=dialog],[role=alertdialog]'); return d[d.length - 1] };
     const FOC = 'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])';
     function focusFix() {
       const d = topDlg(); if (d) { if (!d.contains(document.activeElement)) { const f = d.querySelector('[data-af]') || d.querySelector('button.btn') || d.querySelector('button'); f && f.focus() } return }
@@ -3635,16 +3829,12 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
           if (i >= 0 && L.length > 1) { e.preventDefault(); L[(i + d + L.length) % L.length].focus(); return }
         }
       }
-      if (/^Arrow(Up|Down)$/.test(e.key) && tag === 'INPUT' && /^(text|password|tel|email|search|url)$/.test(t.type)) {
-        const root = t.closest('form,[role=dialog]') || document, L = [...root.querySelectorAll('input:not([type=hidden]):not([disabled]),select,textarea,button.btn:not([disabled])')].filter(x => x.offsetParent !== null), i = L.indexOf(t), n = L[i + (e.key === 'ArrowDown' ? 1 : -1)];
-        if (n) { e.preventDefault(); n.focus() } return
-      }
       if ((tag === 'ARTICLE' || tag === 'TR') && t.hasAttribute('tabindex')) {
         const L = [...document.querySelectorAll(tag === 'TR' ? 'tr[tabindex]' : 'article[tabindex]')], i = L.indexOf(t);
         if (/^Arrow(Right|Down|Left|Up)$/.test(e.key)) { const n = L[i + (/Right|Down/.test(e.key) ? 1 : -1)]; if (n) { e.preventDefault(); n.focus() } return }
         if (e.key === 'Enter' || e.key === ' ') { const b = t.getAttribute('onclick') ? t : t.querySelector('button.btn:not([disabled])'); if (b) { e.preventDefault(); S.refocus = { t: tag, i }; b.click() } }
       }
-      kbArrow(e, t, tag);
+
     }, true);
     // ---> sold-out logic, sales history and tutorial steps <---
     /* A lot leaves the Fresh Catches feed as soon as its last tub is fully claimed (or the database marks it closed). */
@@ -3801,20 +3991,21 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       const wasOpen = !!signKey; signKey = key;
       if (!open) { layer.innerHTML = ''; if (wasOpen && signOpener && document.contains(signOpener)) signOpener.focus({ preventScroll: true }); signOpener = null; return }
       if (!wasOpen) signOpener = document.activeElement;
-      layer.innerHTML = login(); trDom(layer); paintBusy(); signChk(); requestAnimationFrame(focusFix);
+      layer.innerHTML = login(); trDom(layer); associateLabels(layer); paintBusy(); signChk(); requestAnimationFrame(focusFix);
     }
     //-> Functions: openSign() and closeSign()
     //-> Toggle the sign-in overlay state and update only the #signLayer content.
     const openSign = () => { S.go = true; S.diff = false; paintSign() }, closeSign = () => { S.go = false; paintSign() };
     //-> Function: render()
     //-> Saves preferences and queue state, then renders the landing page or signed-in shell, active view, dialogs, and live UI updates.
+    function associateLabels(root) { root.querySelectorAll('label.lbl:not([for])').forEach((label, i) => { let field = label.nextElementSibling; if (field && !field.matches('input,select,textarea')) field = field.querySelector('input,select,textarea'); if (!field) return; if (!field.id) field.id = 'auto-field-' + i; label.htmlFor = field.id; }); }
     function render() {
       requestAnimationFrame(focusFix); if (S.user) S.go = false; save(); prefsPush();
       if (S.user && S.tutDue && !S.newId && !S.tour && !S.pm && !S.pay && !S.pass && !S.bp && !S.br) { S.tutDue = false; S.tour = { i: 0 }; S.tab = TOURS[S.role][0][0] }
       if (S.tour && TOURS[S.role] && TOURS[S.role][S.tour.i]) { S.sb = !!TOURS[S.role][S.tour.i][4]; S.nd = false }
-      document.body.classList.toggle('touring', !!S.tour); paintSign(); document.documentElement.classList.toggle('dark', S.dark); document.documentElement.classList.toggle('light', !S.dark); const a = $('#app');
+      document.documentElement.lang = S.lang === 'TL' ? 'tl' : S.lang === 'TAGLISH' ? 'en-PH' : 'en'; document.body.classList.toggle('touring', !!S.tour); paintSign(); document.documentElement.classList.toggle('dark', S.dark); document.documentElement.classList.toggle('light', !S.dark); const a = $('#app');
       if (!S.user) { const y0 = scrollY; a.innerHTML = landing(); trDom(a); scrollTo(0, y0); revealInit(); paintBusy(); if (!S.go && (!document.activeElement || document.activeElement === document.body)) { const c = $('#cta'); c && c.focus({ preventScroll: true }) } return }
-      a.innerHTML = head() + nav() + `<main class="max-w-6xl mx-auto p-4 pb-28">${view()}</main>` + bottom() + idModal() + evModal() + portionModal() + payModal() + bpModal() + brModal() + passModal() + sbModal() + ndModal() + tourUI(); if (S.tab === 'taripa') calc(); iconify(a); trDom(a); paintBusy(); evChk(); navFix(); requestAnimationFrame(tourPos); if (S.tour) setTimeout(tourPos, 320)
+      a.innerHTML = head() + nav() + `<main class="max-w-6xl mx-auto p-4 pb-28">${S.loadWarning ? `<div role="status" class="mb-4 p-3 rounded-lg bg-amber-50 text-amber-900 border border-amber-300">Could not refresh ${esc(S.loadWarning)}. Displayed information may be out of date. <button class="underline font-semibold" onclick="load(1)">Retry</button></div>` : ''}${view()}</main>` + bottom() + idModal() + evModal() + portionModal() + payModal() + bpModal() + brModal() + passModal() + sbModal() + ndModal() + tourUI(); if (S.tab === 'taripa') calc(); iconify(a); trDom(a); associateLabels(a); paintBusy(); evChk(); navFix(); requestAnimationFrame(tourPos); if (S.tour) setTimeout(tourPos, 320)
     }
     addEventListener('online', () => { if (S.offlineSession) resumeOnline(); else if (S.uid) flushOrderOutbox().then(() => load(1)); render(); if (S.user && S.queue.length) toast('Back online. Open Offline Sync to send saved claims.') }); addEventListener('offline', render);
     (async () => { const C = window.DEAL_CONFIG || {}; if (C.url && C.key && window.supabase) { sb = supabase.createClient(new URL(C.url.trim()).origin, C.key.trim(), { auth: { persistSession: true, autoRefreshToken: true } }); sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') clearStaleAuthTokens() }); try { await enter() } catch (e) { clearStaleAuthTokens() } } render() })();
@@ -3827,12 +4018,13 @@ const mapOrder = r => { const v = r.kind === 'vendor', st = r.status, mk = MARKE
   return { srv: 1, id: r.id, kind: v ? 'vendor_sale' : 'pier_acquisition', cid: r.cid, catchName: esc(r.catch_name || ''), kg: +r.kg, pricePerKg: +r.price_per_kg, total: +r.total,
     brokerId: r.broker_id, vendorId: r.vendor_id, checkerId: r.checker_id, brokerIdent: esc(r.broker_ident || 'Broker'), vendorIdent: esc(r.vendor_ident || 'Micro-Vendor'), checkerIdent: 'Pier Checker',
     status: s, stage: r.stage, escrowStatus: st === 'completed' ? 'Released' : 'Escrow Held', payMethod: r.payment_method, payRef: r.payment_ref,
-    fulfillment: r.fulfillment === 'delivery' ? 'broker_delivery' : 'self_pickup', marketId: r.market, marketName: mk ? mk.name : 'Navotas Pier Dock', stallNote: r.instruction || '',
+    fulfillment: r.fulfillment === 'delivery' ? 'broker_delivery' : 'self_pickup', marketId: r.market, marketName: mk ? mk.name : (LEGACY_MARKETS[r.market] || (r.market ? 'Destination: ' + esc(r.market) : 'Navotas Pier Dock')), stallNote: r.instruction || '',
     pierStation: r.src, pierLocation: r.src, vehicle: r.vehicle || null, route: r.vehicle ? calcMarketRoute(r.market, r.vehicle.vehicleType, +r.kg) : null, qrPayload: r.qr_payload || null, chats: (SRV_CH[r.id] || []), ratings: Object.fromEntries(Object.entries(r.ratings || {}).map(([k, v]) => [k, { stars: v.stars, comment: esc(v.comment || ''), at: new Date(v.at).toLocaleString() }])), createdAt: r.created_at, updatedAt: r.updated_at } };
 let SRV_CH = {};
-async function loadSrvOrders() { try { const [r, m] = await Promise.all([sb.rpc('my_orders'), sb.rpc('my_order_messages')]);
-  SRV_CH = {}; if (!m.error) (m.data || []).forEach(x => { (SRV_CH[x.order_id] = SRV_CH[x.order_id] || []).push({ role: x.role, sender: esc(x.sender || ''), text: esc(x.body), at: new Date(x.created_at).toLocaleTimeString() }) });
-  if (!r.error) S.srvOrders = (r.data || []).map(mapOrder) } catch (e) { } }
+async function loadSrvOrders() { try { const [r, m, hidden] = await Promise.all([sb.rpc('my_orders'), sb.rpc('my_order_messages'), sb.rpc('my_hidden_orders')]);
+  if (!hidden.error) S.hiddenOrders = hidden.data || [];
+  S.orderLoadError = !!(r.error || m.error); if (!m.error) SRV_CH = {}; if (!m.error) (m.data || []).forEach(x => { (SRV_CH[x.order_id] = SRV_CH[x.order_id] || []).push({ role: x.role, sender: esc(x.sender || ''), text: esc(x.body), at: new Date(x.created_at).toLocaleTimeString() }) });
+  if (!r.error) S.srvOrders = (r.data || []).map(mapOrder) } catch (e) { S.orderLoadError = true; } }
 /* Grab-style tracker: Placed -> On Delivery / Ready -> Delivered */
 function orderTracker(o) { if (!o.srv || o.status === 'Rejected') return ''; const i = o.status === 'Delivered' ? 2 : o.stage === 'on_delivery' ? 1 : 0;
   const lab = ['Placed', (o.kind === 'vendor_sale' && o.fulfillment === 'self_pickup') ? 'Ready' : 'On Delivery', 'Delivered'];
@@ -3855,13 +4047,19 @@ async function saveInstruction(id) { const o = ordRead().find(x => x.id === id),
 async function sendOrderChat(id) { const i = $('#chat-in-' + id), t = i ? i.value.trim() : ''; if (!t) return toast('Enter a message first.', 1);
   const o = ordRead().find(x => x.id === id); if (!await rpcDo('send_order_message', { p_id: id, p_body: t }, 'Sent.')) return;
   if (o) noteFor((o.kind === 'pier_acquisition' ? ['checker', 'broker'] : ['broker', 'vendor']).filter(x => x !== S.role), 'New Order Message', `${roleLabel(S.role)} (${o.cid}): ${t.slice(0, 60)}`) }
-async function clearAllOrders() { toast('Orders are stored on the server and cannot be cleared here.', 1) }
+async function clearAllOrders() {
+  if (!online()) return toast('Connect to the internet to clear completed orders.', 1);
+  if (!await ask('Clear completed orders?', 'Completed and rejected orders will be hidden from your Orders screen, including their receipts and ratings there. Active orders and other users are unaffected.', 'Clear orders', 1)) return;
+  try {
+    const { data, error } = await sb.rpc('clear_completed_orders');
+    if (error) return toast('Could not clear orders. Make sure the order clearing database update is installed.', 1);
+    await loadSrvOrders(); render(); toast((Number(data) || 0) + ' completed or rejected order(s) cleared from your view.');
+  } catch (e) { toast('Could not clear orders. Check your connection and try again.', 1) }
+}
 function cancelOrder() { toast('Pending orders are accepted or rejected by the other party.', 1) }
 const PICKUP_MSG = 'Please pick up at the pier', WAIT_MSG = 'Please wait until your order is delivered';
 function orderControls(o) { if (!o.srv || ORD_TAB === 'rate') return '';
-  const live = o.status === 'Pending Acceptance' || o.status === 'Pending Approval' || o.status === 'Accepted' || o.status === 'In Transit';
   let h = '';
-  if (live && o.qrPayload) h += renderOrderQrCard(o, o.kind === 'pier_acquisition' ? 'Hand-off QR · show to Pier Checker' : 'Pickup / delivery QR · show to Broker', 'Same QR you got right after payment.', [['Order', o.id], ['Payment', o.payMethod || '—']]);
   if (S.role === 'broker' && o.kind === 'vendor_sale' && (o.status === 'Accepted' || o.status === 'In Transit')) {
     h += `<div class="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50"><div class="text-xs font-mono font-semibold text-slate-600 uppercase mb-2">Fulfillment instruction</div><div class="flex flex-col sm:flex-row gap-2"><select id="ins-${o.id}" class="inp flex-1"><option ${o.stallNote === PICKUP_MSG ? 'selected' : ''}>${PICKUP_MSG}</option><option ${o.stallNote !== PICKUP_MSG ? 'selected' : ''}>${WAIT_MSG}</option></select><button type="button" class="btn2" onclick="saveInstruction('${o.id}')">Save</button>${o.fulfillment === 'self_pickup' && o.stage === 'placed' ? `<button type="button" class="btn" onclick="markReady('${o.id}')">Mark Ready for pickup</button>` : ''}</div></div>` }
   return h }
