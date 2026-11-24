@@ -2279,7 +2279,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       const pay = p.pay || payOf(p), c = find(p.cid), kg = +p.kg, total = +p.total, t = c ? tar(c.price, kg) : null, item = t && Math.abs(t.total - total) < .01;
       const rows = [['Receipt no.', p.id], ['Date', new Date(p.created_at || Date.now()).toLocaleString()], ['Vendor', S.user || ''], ['Catch', String(p.name || '')], ['Portion weight', kg + ' kg']];
       const items = item ? [['Base (' + fmt(c.price) + ' × ' + kg + ' kg)', fmt(t.base)], ['Port fee (₱2.50/kg)', fmt(t.port)], ['Broker commission (5%)', fmt(t.comm)], ['Ice / tub handling', fmt(t.ice)]] : [];
-      const pr = [['Payment method', payLbl(pay && pay.method)], ['Payment ref.', pay && pay.method !== 'cash' ? String(pay.ref) : '—'], ['Status', p.status === 'escrow' ? 'Escrow held' : 'Released']];
+      const pr = [['Payment method', payLbl(pay && pay.method)], ['Payment ref.', pay && pay.method !== 'cash' ? String(pay.ref) : '—'], ['Status', pay && pay.method === 'cashless' ? 'Paid (demo)' : 'Cash due; not verified']];
       const notes = [pay && pay.method === 'cash' ? 'Pay the exact amount in cash at dockside pickup.' : 'Escrow is released once the broker verifies pickup.'].concat(pay && pay.method === 'cashless' ? ['Cashless payment is for demo only. No real money was charged.'] : []);
       const qrText = p.pass_token ? qrPayload(p) : '';
       const S2 = 2, W = 640, H = 150 + (rows.length + items.length + pr.length) * 30 + 90 + notes.length * 22 + 40 + (qrText ? 200 : 0), cv = document.createElement('canvas'); cv.width = W * S2; cv.height = H * S2;
@@ -2312,7 +2312,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     const BPMEM = {};
     const bpKey = () => 'deal-bidpay-' + S.uid;
     const bpMap = () => { try { return JSON.parse(localStorage.getItem(bpKey())) || {} } catch (e) { return {} } };
-    const bpOf = id => { const o = (S.srvOrders || []).find(x => x.kind === 'pier_acquisition' && x.cid === id && x.brokerId === S.uid && x.status !== 'Rejected'); return o ? { method: o.payMethod, ref: o.payRef, at: o.createdAt, kg: o.kg, bid: o.pricePerKg, total: o.total } : (S.srvOrders ? null : (BPMEM[S.uid + '|' + id] || bpMap()[id] || null)) };
+    const bpOf = id => { const o = (S.srvOrders || []).find(x => x.kind === 'pier_acquisition' && x.cid === id && x.brokerId === S.uid && !['Rejected','Cancelled'].includes(x.status)); return o ? { method: o.payMethod, ref: o.payRef, at: o.createdAt, kg: o.kg, bid: o.pricePerKg, total: o.total } : (S.srvOrders ? null : (BPMEM[S.uid + '|' + id] || bpMap()[id] || null)) };
     function bpSave(id, pay) { BPMEM[S.uid + '|' + id] = pay; try { const m = bpMap(); m[id] = pay; localStorage.setItem(bpKey(), JSON.stringify(m)) } catch (e) { } }
     const bpWon = c => !!c && !!S.uid && S.role === 'broker' && !!c.settled_at && c.winner_id === S.uid;
     const bpDue = c => bpWon(c) && !bpOf(c.id);
@@ -2362,9 +2362,9 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     };
     const brModal = () => {
       const id = S.br; if (!id) return ''; const c = find(id), p = bpOf(id); if (!c || !p) { S.br = null; return '' }
-      return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-sm p-5 text-center" role="dialog" aria-modal="true" aria-label="Payment receipt"><span class="badge bg-emerald-100 text-emerald-800">Paid</span>
-  <h2 class="font-mono font-bold text-lg mt-2">Payment received</h2>
-  <div class="text-left mt-3">${kv('Receipt no.', 'BID-' + esc(c.id))}${kv('Catch', c.name)}${kv('Winning bid', fmt(p.bid) + '/kg')}${kv('Weight', p.kg + ' kg')}${kv('Payment', payLbl(p.method))}${kv('Reference', esc(p.ref))}${kv('Total paid', fmt(p.total))}</div>
+      return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-sm p-5 text-center" role="dialog" aria-modal="true" aria-label="Payment receipt"><span class="badge bg-emerald-100 text-emerald-800">${p.method === 'cashless' ? 'Paid (demo)' : 'Cash due'}</span>
+  <h2 class="font-mono font-bold text-lg mt-2">${p.method === 'cashless' ? 'Demo payment recorded' : 'Cash payment due'}</h2>
+  <div class="text-left mt-3">${kv('Receipt no.', 'BID-' + esc(c.id))}${kv('Catch', c.name)}${kv('Winning bid', fmt(p.bid) + '/kg')}${kv('Weight', p.kg + ' kg')}${kv('Payment', payLbl(p.method))}${kv('Reference', esc(p.ref))}${kv(p.method === 'cashless' ? 'Total paid (demo)' : 'Total due', fmt(p.total))}</div>
   ${p.method === 'cashless' ? `<p role="note" class="mt-3 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-300 rounded-lg p-2">This cashless payment is for demo only. No real money is charged.</p>` : ''}
   ${payQr(c)}<button class="btn2 mt-3 w-full" onclick="dlBidReceipt('${esc(c.id)}')">Download receipt</button><button class="btn mt-2" onclick="S.br=null;render()">Done</button></div></div>`
     };
@@ -2372,7 +2372,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     //-> Renders the "you won" card on the selected lot: payment due with a button, or paid with a receipt download.
     const bpCard = c => {
       if (!bpWon(c)) return ''; const p = bpOf(c.id), t = tar(c.bid, +c.kg);
-      return p ? `<div class="rounded-lg p-3 text-sm mt-3 bg-emerald-50 border border-emerald-200"><div class="flex flex-wrap justify-between items-center gap-2"><span>✅ <b>Final bid paid</b> · <span>${payLbl(p.method)}</span> · <b class="font-mono">${fmt(p.total)}</b></span><span class="flex flex-wrap gap-2"><button class="btn2 !py-1.5" onclick="bpOpen('${esc(c.id)}')">View payment QR</button><button class="btn2 !py-1.5" onclick="dlBidReceipt('${esc(c.id)}')">Download receipt</button></span></div></div>`
+      return p ? `<div class="rounded-lg p-3 text-sm mt-3 bg-emerald-50 border border-emerald-200"><div class="flex flex-wrap justify-between items-center gap-2"><span>✅ <b>${p.method === 'cashless' ? 'Paid (demo)' : 'Cash due'}</b> · <span>${payLbl(p.method)}</span> · <b class="font-mono">${fmt(p.total)}</b></span><span class="flex flex-wrap gap-2"><button class="btn2 !py-1.5" onclick="bpOpen('${esc(c.id)}')">View payment QR</button><button class="btn2 !py-1.5" onclick="dlBidReceipt('${esc(c.id)}')">Download receipt</button></span></div></div>`
         : `<div class="rounded-lg p-3 text-sm mt-3 bg-amber-50 border border-amber-300"><div>🏆 <b>You won this lot</b> · <span>Payment due</span> <b class="font-mono">${fmt(t.total)}</b></div><button class="btn mt-2" onclick="bpOpen('${esc(c.id)}')">Choose payment method</button></div>`
     };
     //-> Function: wonList()
@@ -2382,7 +2382,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       return `<h2 class="font-mono text-xs text-slate-500 uppercase mb-2">Won auctions · final bid payment</h2>` + l.map(c => {
         const p = bpOf(c.id), t = tar(c.bid, +c.kg);
         return `<div class="card p-4 mb-3 flex flex-wrap justify-between gap-3 items-center"><div><div class="font-mono text-xs text-slate-500">${esc(c.id)}</div><b>${c.name}</b> ${lotTag(c)}<div class="text-sm">${c.kg} kg × ${fmt(c.bid)}/kg · ${fmt(p ? p.total : t.total)}</div></div>
-  <div class="text-right"><span class="badge ${p ? 'b-sync' : 'b-pend'}">${p ? `<span>Paid</span> · <span>${payLbl(p.method)}</span>` : 'Payment due'}</span><br>${p ? `<button class="btn2 mt-2 !py-1.5" onclick="dlBidReceipt('${esc(c.id)}')">Download receipt</button>` : `<button class="btn mt-2 !w-auto !py-1.5 px-4" onclick="bpOpen('${esc(c.id)}')">Pay amount</button>`}</div></div>`
+  <div class="text-right"><span class="badge ${p ? 'b-sync' : 'b-pend'}">${p ? `<span>${p.method === 'cashless' ? 'Paid (demo)' : 'Cash due'}</span> · <span>${payLbl(p.method)}</span>` : 'Payment due'}</span><br>${p ? `<button class="btn2 mt-2 !py-1.5" onclick="dlBidReceipt('${esc(c.id)}')">Download receipt</button>` : `<button class="btn mt-2 !w-auto !py-1.5 px-4" onclick="bpOpen('${esc(c.id)}')">Pay amount</button>`}</div></div>`
       }).join('') + '<div class="h-2"></div>'
     };
     //-> Function: dlBidReceipt(lotId)
@@ -2394,7 +2394,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       const t = tar(p.bid, p.kg), rn = 'BID-' + String(id).replace(/[^\w-]/g, '');
       const rows = [['Receipt no.', rn], ['Date', new Date(p.at || Date.now()).toLocaleString()], ['Broker', S.user || ''], ['Lot', String(c.id)], ['Catch', String(c.name || '')], ['Winning bid', fmt(p.bid) + '/kg'], ['Lot weight', p.kg + ' kg']];
       const items = [['Base (' + fmt(p.bid) + ' × ' + p.kg + ' kg)', fmt(t.base)], ['Port fee (₱2.50/kg)', fmt(t.port)], ['Commission (5%)', fmt(t.comm)], ['Ice / handling', fmt(t.ice)]];
-      const pr = [['Payment method', payLbl(p.method)], ['Payment ref.', String(p.ref)], ['Status', 'Paid']];
+      const pr = [['Payment method', payLbl(p.method)], ['Payment ref.', String(p.ref)], ['Status', p.method === 'cashless' ? 'Paid (demo)' : 'Cash due']];
       const notes = p.method === 'cashless' ? ['Cashless payment is for demo only. No real money was charged.'] : [];
       const S2 = 2, W = 640, H = 150 + (rows.length + items.length + pr.length) * 30 + 90 + notes.length * 22 + 40 + (qrText ? 236 : 0), cv = document.createElement('canvas'); cv.width = W * S2; cv.height = H * S2;
       const x = cv.getContext('2d'); x.scale(S2, S2); x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
@@ -2404,7 +2404,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       const fit = (s, w) => { s = String(s); while (s.length > 1 && x.measureText(s).width > w) s = s.slice(0, -2) + '…'; return s };
       const row = (l, v, b) => { x.textAlign = 'left'; x.fillStyle = '#64748b'; x.font = '14px ' + SANS; x.fillText(l, 32, y); x.textAlign = 'right'; x.fillStyle = '#0B0E17'; x.font = (b ? 'bold ' : '') + '14px ' + MONO; x.fillText(fit(v, W - 64 - 190), W - 32, y); y += 30 };
       line(); rows.forEach(r => row(r[0], r[1])); line(); items.forEach(r => row(r[0], r[1]));
-      x.textAlign = 'left'; x.fillStyle = '#0B0E17'; x.font = 'bold 18px ' + SANS; x.fillText('Total paid', 32, y + 4); x.textAlign = 'right'; x.fillStyle = '#059669'; x.font = 'bold 22px ' + MONO; x.fillText(fmt(p.total), W - 32, y + 4); y += 34;
+      x.textAlign = 'left'; x.fillStyle = '#0B0E17'; x.font = 'bold 18px ' + SANS; x.fillText(p.method === 'cashless' ? 'Total paid (demo)' : 'Total due', 32, y + 4); x.textAlign = 'right'; x.fillStyle = '#059669'; x.font = 'bold 22px ' + MONO; x.fillText(fmt(p.total), W - 32, y + 4); y += 34;
       line(); pr.forEach(r => row(r[0], r[1])); y += 2;
       x.textAlign = 'center'; x.fillStyle = '#64748b'; x.font = '12px ' + SANS; notes.forEach(n => { x.fillText(n, W / 2, y); y += 22 });
       if (qrText && drawQrOnCanvas(x, qrText, W / 2, y + 8, 184)) { y += 212; x.fillStyle = '#0B4A5D'; x.font = 'bold 12px ' + MONO; x.fillText('HAND-OFF QR · ' + o.id, W / 2, y); }
@@ -2442,8 +2442,8 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     const kv = (a, b) => `<div class="flex justify-between gap-3 py-1 border-b text-sm"><span class="text-slate-500">${a}</span><b class="font-mono text-right break-all">${b}</b></div>`;
     const passModal = () => {
       const p = S.pass; if (!p || !p.pass_token) return '';
-      return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-sm p-5 text-center" role="dialog" aria-modal="true"><span class="badge bg-yellow-100 text-yellow-800">Escrow held</span>
- <h2 class="font-mono font-bold text-lg mt-2">Escrow pass generated</h2>
+      return `<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-sm p-5 text-center" role="dialog" aria-modal="true" aria-label="Claim pass"><span class="badge bg-yellow-100 text-yellow-800">${(p.pay || payOf(p) || {}).method === 'cashless' ? 'Paid (demo)' : 'Cash due'}</span>
+ <h2 class="font-mono font-bold text-lg mt-2">Claim pass generated</h2>
  <div class="rounded-xl p-2 mx-auto my-3 max-w-[260px]" style="background:#fff">${qrSvg(qrPayload(p))}</div>
  <div class="text-left">${kv('Pass ID', esc(p.id))}${kv('Catch', esc(p.name))}${kv('Portion weight', p.kg + ' kg')}${kv('Escrow amount', fmt(p.total))}${kv('Payment', payLbl((p.pay || payOf(p) || {}).method))}</div>
  <p class="text-xs text-slate-500 mt-3">Show this QR code to the broker at dockside pickup.</p><button class="btn2 mt-3 w-full" onclick="dlReceipt('${esc(p.id)}')">Download receipt</button><button class="btn !w-full mt-2" onclick="S.pass=null;render()">Done</button></div></div>`
@@ -2460,8 +2460,14 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
       const q = S.queue.slice(), keep = []; let ok = 0;
       for (const x of q) {
         try {
+          if (!x.requestId && x.syncError) { x.syncError = 'This older request may already have been submitted. Check Orders, then remove it or place a new claim.'; keep.push(x); continue; }
+          if (!x.requestId) {
+            x.requestId = crypto.randomUUID(); save();
+            const stored = LS('deal-q-' + S.uid, []);
+            if (!stored.some(item => item.requestId === x.requestId)) { delete x.requestId; x.syncError = 'Could not save the request safely on this device. Free storage and try again.'; keep.push(x); continue; }
+          }
           const ship = x.shipOpts || {}, pay = x.pay || {};
-          const { data, error } = await sb.rpc('claim_from_floor', { p_cid: x.id, p_kg: x.kg, p_method: pay.method || 'cash', p_fulfillment: ship.fulfillment === 'self_pickup' ? 'pickup' : 'delivery', p_market: ship.marketId || null, p_note: ship.stallNote || null });
+          const { data, error } = await sb.rpc('claim_from_floor_once', { p_request_id: x.requestId, p_cid: x.id, p_kg: x.kg, p_method: pay.method || 'cash', p_fulfillment: ship.fulfillment === 'self_pickup' ? 'pickup' : 'delivery', p_market: ship.marketId || null, p_note: ship.stallNote || null });
           if (error || !data || !data.success) { x.syncError = error && isNetErr(error) ? 'Connection interrupted. Check Orders before retrying to avoid a duplicate request.' : (error && error.message) || (data && data.message) || 'Could not sync. Check the order before trying again.'; keep.push(x); }
           else ok++;
         } catch (e) { x.syncError = 'Connection interrupted. Check Orders before retrying to avoid a duplicate request.'; keep.push(x); }
@@ -2477,7 +2483,7 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
         + (br ? `<div class="card p-4 mb-4 flex flex-wrap items-center justify-between gap-3"><div><b>Dockside pickup check</b><div class="text-sm text-slate-500">Scan the vendor's QR pass to verify and release escrow.</div></div><button class="btn !w-auto px-5" data-k="scan" onclick="run(this,'Opening camera…',openScanner)">📷 Open QR Pass Scanner</button></div>` : '')
         + (br ? wonList() : '')
         + (S.passes.map(p => `<div class="card p-4 mb-3 flex flex-wrap justify-between gap-3 items-center"><div><div class="font-mono text-xs text-slate-500">${p.id}</div><b>${p.name}</b> ${lotTag(find(p.cid))}<div class="text-sm">${p.kg} kg · ${fmt(p.total)} · ${p.t}</div>${S.role === 'broker' ? payRow(p) : ''}</div>
- <div class="text-right"><span class="badge ${p.status === 'escrow' ? 'b-pend' : 'b-sync'}">${p.status === 'escrow' ? 'Escrow held' : p.scanned_at ? 'Released / Verified pickup' : 'Released'}</span>${vd && p.status === 'escrow' && p.pass_token ? `<br><button class="btn2 mt-2 !py-1.5" onclick="showQr('${p.id}')">Show QR Code</button>` : ''}${vd ? `<br><button class="btn2 mt-2 !py-1.5" onclick="dlReceipt('${p.id}')">Download receipt</button>` : ''}${br && p.status === 'escrow' ? `<br><button class="btn2 mt-2 !py-1.5" data-k="rel-${p.id}" onclick="relAsk(this,'${p.id}')">Approve escrow release</button>` : ''}</div></div>`).join('') || '<p class="text-slate-500">No passes yet. Claim a portion on the Fresh Catches Floor.</p>')
+ <div class="text-right"><span class="badge ${p.status === 'escrow' ? 'b-pend' : 'b-sync'}">${p.status === 'escrow' ? ((payOf(p) || {}).method === 'cashless' ? 'Paid (demo)' : 'Cash due') : 'Pickup verified'}</span>${vd && p.status === 'escrow' && p.pass_token ? `<br><button class="btn2 mt-2 !py-1.5" onclick="showQr('${p.id}')">Show QR Code</button>` : ''}${vd ? `<br><button class="btn2 mt-2 !py-1.5" onclick="dlReceipt('${p.id}')">Download receipt</button>` : ''}${br && p.status === 'escrow' ? `<br><button class="btn2 mt-2 !py-1.5" data-k="rel-${p.id}" onclick="relAsk(this,'${p.id}')">Approve escrow release</button>` : ''}</div></div>`).join('') || '<p class="text-slate-500">No passes yet. Claim a portion on the Fresh Catches Floor.</p>')
     }
     //-> Function: release(passId)
     //-> Requests a broker escrow release through Supabase and refreshes the ledger after success.
@@ -2556,23 +2562,23 @@ ${vend ? `<div class="text-xs font-mono mt-1 min-h-[1rem] text-teal-700">${ab ? 
     const F = (n, l, v, t = 'text') => `<div><label class="lbl">${l} *</label><input name="${n}" type="${t}" placeholder="e.g. ${v}" class="inp"></div>`;
     function intake() {
       const sel = (n, l, o) => `<div><label class="lbl">${l} *</label><select name="${n}" class="inp${o === PIERS ? ' pier-select' : ''}">${o.map(x => `<option>${x}</option>`).join('')}</select></div>`;
-      return h1('Dockside Intake & Inspection', 'Timbang. Suri. Tala. Log the landing and the AI Suri-Isda Guard inspects it.') + `<div class="bg-[#0B0E17] text-white rounded-xl p-4 mb-4 font-mono text-sm">ASSIGNED STATION: ${S.station} · Tally officer ${S.user}</div>
-<form class="card p-5 max-w-3xl mx-auto" onsubmit="logGo(event)"><h2 class="font-mono font-bold text-lg">Log Incoming Catch</h2><span class="badge bg-yellow-100 text-yellow-800">AI inspection on submit</span>
+      return h1('Dockside Intake & Inspection', AI_DEMO ? 'Timbang. Suri. Tala. Log the landing with a simulated demo rating.' : 'Timbang. Suri. Tala. Log the landing and the AI Suri-Isda Guard inspects it.') + `<div class="bg-[#0B0E17] text-white rounded-xl p-4 mb-4 font-mono text-sm">ASSIGNED STATION: ${S.station} · Tally officer ${S.user}</div>
+<form class="card p-5 max-w-3xl mx-auto" onsubmit="logGo(event)"><h2 class="font-mono font-bold text-lg">Log Incoming Catch</h2><span class="badge bg-yellow-100 text-yellow-800">${AI_DEMO ? 'Simulated demo rating on submit' : 'AI inspection on submit'}</span>
 ${F('name', 'Common name', 'Galunggong (Round Scad)')}
 <div class="grid grid-cols-2 gap-3">${F('kg', 'Tub weight (kg)', 40, 'number')}${F('tubs', 'Available tubs', 15, 'number')}${F('base', 'Wholesale base (₱/kg)', 185, 'number')}${F('start', 'Starting bid (₱/kg)', 175, 'number')}</div>
 ${sel('station', 'Landing station', PIERS)}${F('vessel', 'Vessel / source', 'F/V San Miguel Navotas')}
 <div class="mt-5 border-t pt-4"><h3 class="font-mono font-bold">Suri-Isda Quality Guard · AI check</h3>
-${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of the tub. When you submit, the AI reviews them, runs the checklist below, gives the freshness score and decides whether the lot passes or is flagged.</p>
+${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">${AI_DEMO ? 'Add three readable photos. Every valid demo submission passes and receives a random rating; the photos are not assessed for quality.' : 'Add three clear photos of the tub. When you submit, the AI reviews them, runs the checklist below, gives the freshness score and decides whether the lot passes or is flagged.'}</p>
 <ul class="text-xs text-slate-600 mt-2 grid gap-1 sm:grid-cols-2">${['Bottom core sample', 'Gill & eye freshness', 'Weight and species match', 'Multi-angle proof reviewed'].map(x => `<li>🔍 ${x}</li>`).join('')}</ul>
 <div class="grid grid-cols-3 gap-2 mt-3 text-xs text-center">${['Front', 'Middle', 'Bottom'].map((x, i) => `<label class="relative border-2 border-dashed rounded-lg h-28 flex items-center justify-center cursor-pointer overflow-hidden"><span>${x} +</span><img id="evp${i}" class="hidden absolute inset-0 w-full h-full object-cover" alt=""><span id="evc${i}" class="hidden absolute bottom-1 inset-x-1 bg-emerald-600 text-white text-[0.6875rem] font-bold rounded px-1 py-0.5">✓ Photo Captured</span><input id="ev${i}" type="file" accept="image/*" class="hidden" onchange="prev(this,'evp${i}');fishPick(this,${i})"></label>`).join('')}</div>
-<p class="text-xs text-slate-500 mt-2">Front = top layer of the tub. ${AI_DEMO ? 'Demo mode: the pass/flag result is randomly generated.' : 'Only photos of fish are accepted; anything else is rejected.'} The front photo is also shown on the lot card.</p></div>
+<p class="text-xs text-slate-500 mt-2">Front = top layer of the tub. ${AI_DEMO ? 'Demo mode: all valid submissions pass with a random rating.' : 'Only photos of fish are accepted; anything else is rejected.'} The front photo is also shown on the lot card.</p></div>
 <button class="btn !w-full mt-4" data-k="log">+ Log Incoming Catch</button></form>`}
     const shrink = (f, m = 800, q = .75) => new Promise(r => { if (!f) return r(null); const i = new Image, u = URL.createObjectURL(f); i.onload = () => { const k = Math.min(1, m / Math.max(i.width, i.height)), c = document.createElement('canvas'); c.width = Math.round(i.width * k); c.height = Math.round(i.height * k); c.getContext('2d').drawImage(i, 0, 0, c.width, c.height); URL.revokeObjectURL(u); r(c.toDataURL('image/jpeg', q)) }; i.onerror = () => r('ERR'); i.src = u });
     function prev(inp, id) { const f = inp.files[0], im = $('#' + id); if (!f) { im.classList.add('hidden'); return } im.onerror = () => { toast('This photo could not be previewed. Use a JPG or PNG image.', 1); im.classList.add('hidden') }; im.src = URL.createObjectURL(f); im.classList.remove('hidden') }
     async function viewEv(id) { const { data, error } = await sb.from('checks').select('*').eq('id', id).maybeSingle(); if (error || !data) return toast('Could not load the evidence.', 1); S.ev = data; render() }
     async function viewInsp(cid) { const { data, error } = await sb.rpc('get_inspection', { p_cid: cid }); if (error) return toast(error.message, 1); if (!data) return toast('No inspection record found for this lot.', 1); S.ev = data; render() }
     const AIK = [['bottom_core', 'Bottom core sample'], ['gill_eye', 'Gill & eye freshness'], ['weight_species', 'Weight and species match'], ['multi_angle', 'Multi-angle proof reviewed']];
-    const aiBlock = r => { if (!r || !r.checks) return ''; return `<div class="mt-3 border rounded-lg p-3"><div class="font-mono text-xs text-slate-500 mb-1">AI SURI-ISDA CHECKLIST${AI_DEMO ? ' · DEMO ONLY' : ''}</div>${AIK.map(([k, l]) => { const c = r.checks[k] || {}; return `<div class="flex gap-2 text-sm py-1 border-b"><span class="${c.pass ? 'text-teal-700' : 'text-red-700'} font-bold">${c.pass ? '✓' : '✗'}</span><span><b>${l}</b>${c.note ? `<br><span class="text-xs text-slate-500">${esc(c.note)}</span>` : ''}</span></div>` }).join('')}${r.summary ? `<p class="text-xs mt-2">${esc(r.summary)}</p>` : ''}</div>` };
+    const aiBlock = r => { if (!r || !r.checks) return ''; return `<div class="mt-3 border rounded-lg p-3"><div class="font-mono text-xs text-slate-500 mb-1">AI SURI-ISDA CHECKLIST${r.demo || (r.summary || '').startsWith('DEMO ONLY') ? ' · DEMO ONLY' : ''}</div>${AIK.map(([k, l]) => { const c = r.checks[k] || {}; return `<div class="flex gap-2 text-sm py-1 border-b"><span class="${c.pass ? 'text-teal-700' : 'text-red-700'} font-bold">${c.pass ? '✓' : '✗'}</span><span><b>${l}</b>${c.note ? `<br><span class="text-xs text-slate-500">${esc(c.note)}</span>` : ''}</span></div>` }).join('')}${r.summary ? `<p class="text-xs mt-2">${esc(r.summary)}</p>` : ''}</div>` };
     const evModal = () => {
       const d = S.ev; if (!d) return ''; const ok = u => /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(u || '');
       const ph = [d.photo_top, d.photo_mid, d.photo_bot].map((u, i) => ok(u) ? `<div><img src="${u}" class="rounded-lg w-full h-28 object-cover" alt=""><div class="text-xs text-center mt-1">${['Top', 'Middle', 'Bottom'][i]}</div></div>` : '').join('');
@@ -2580,7 +2586,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
     };
     //-> Function: logGo(event)
     //-> Prevents the browser form submit and runs logCatch() through the shared busy/error handling.
-    function logGo(e) { e.preventDefault(); const f = e.target; return run(e.submitter || f.querySelector('button[data-k=log]'), 'AI is inspecting…', () => logCatch(f)) }
+    function logGo(e) { e.preventDefault(); const f = e.target; return run(e.submitter || f.querySelector('button[data-k=log]'), AI_DEMO ? 'Generating demo rating…' : 'AI is inspecting…', () => logCatch(f)) }
     // ---> on-device AI Suri-Isda Guard (no API key) <---
     //-> Runs a small CLIP vision-language model inside the browser through transformers.js. The model files are downloaded once from the public CDN / Hugging Face and then cached by the browser.
     //-> Every photo must first be recognised as FISH (crustaceans, shellfish, people, objects etc. are rejected); only then are the checklist and freshness score estimated.
@@ -2641,6 +2647,16 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
     const aiThumb = url => new Promise(r => { const i = new Image(); i.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 16; const x = c.getContext('2d'); x.drawImage(i, 0, 0, 16, 16); const d = x.getImageData(0, 0, 16, 16).data, g = []; let m = 0; for (let k = 0; k < d.length; k += 4) { const v = .299 * d[k] + .587 * d[k + 1] + .114 * d[k + 2]; g.push(v); m += v } r({ g, m: m / g.length }) }; i.onerror = () => r(null); i.src = url });
     //-> Function: aiInspect(files, photos): fish gate on all three photos, then the 4-point checklist, the freshness score and the pass / flag verdict.
     async function aiInspect(files, ev) {
+      if (AI_DEMO) {
+        const sc = (Math.floor(Math.random() * 19) + 2) / 2;
+        const note = 'Demo result only; this photo was not evaluated for fish quality.';
+        return { demo: true, checks: {
+          bottom_core: { pass: true, note },
+          gill_eye: { pass: true, note },
+          weight_species: { pass: true, note: 'Demo only. Confirm species and weight manually.' },
+          multi_angle: { pass: true, note: 'Three readable photos were provided for the demonstration.' }
+        }, freshness_score: sc, passed: true, summary: `DEMO ONLY: Random rating ${sc}/10. This is not a real fish quality inspection.` };
+      }
       const R = []; for (let i = 0; i < 3; i++)R.push(await aiRead(files[i], ev[i]));
       const bad = R.findIndex(r => r.fish < FISH_MIN); if (bad >= 0) throw new Error(`The ${FL[bad]} photo does not look like fish. Only photos of fish are accepted.`);
       const T = await Promise.all(ev.map(aiThumb)); let dup = false;
@@ -2686,14 +2702,14 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
         return toast(msg, 1);
       }
       const up = await sb.from('catches').update({ verified: pass, fresh: sc }).eq('id', id); if (up.error) return toast(`${id} was logged, but the AI result could not be saved: ` + up.error.message, 1);
-      const rep = { checks: ai.checks, freshness_score: sc, passed: pass, summary: ai.summary || '' };
+      const rep = { demo: !!ai.demo, checks: ai.checks, freshness_score: sc, passed: pass, summary: ai.summary || '' };
       { const m = lsMap(LOGK()); m[id] = { t: new Date().toISOString(), res: pass ? 'Passed' : 'Flagged', name }; lsSet(LOGK(), m) }
       const ci = await sb.from('checks').insert({ cid: id, name, res: pass ? 'Passed' : 'Flagged', fresh: sc, by_name: S.user, photo_top: ev[0], photo_mid: ev[1], photo_bot: ev[2], ai_report: rep });
       if (ci.error) toast('Lot saved, but the inspection record was not: ' + ci.error.message, 1);
       await load();
       if (pass) playChime();
       S.ev = { cid: id, name, res: pass ? 'Passed' : 'Flagged', fresh: sc, by_name: S.user, photo_top: ev[0], photo_mid: ev[1], photo_bot: ev[2], ai_report: rep }; render();
-      toast(pass ? `${id} passed the AI Suri-Isda check.` : `${id} was logged but flagged by the AI check.`, !pass)
+      toast(ai.demo ? `${id} passed the demo check. Rating: ${sc}/10.` : pass ? `${id} passed the AI Suri-Isda check.` : `${id} was logged but flagged by the AI check.`, !pass)
     }
     function register() {
       const pend = S.catches.filter(c => !c.verified && !S.checks.some(k => k.id === c.id));
@@ -2734,7 +2750,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
             : state === 'open' ? `<div class="rounded-lg p-3 text-sm mt-3 bg-slate-50 border border-slate-200">No bids yet. The first bid starts the 1-minute closing clock.</div>` : '';
       const form = canBid ? `<div class="mt-3"><label class="lbl !mt-0" for="bidAmt">Your bid (₱/kg)</label><div class="flex gap-2"><input id="bidAmt" type="number" inputmode="decimal" step="0.5" min="${min}" value="${val}" class="inp flex-1 font-mono text-lg" oninput="S.bidIn['${c.id}']=this.value" onkeydown="if(event.key==='Enter')document.querySelector('[data-k=\\'bid-${c.id}\\']').click()"><button class="btn !w-auto px-5" data-k="bid-${c.id}" ${mine ? 'disabled' : ''} onclick="run(this,'Placing bid…',()=>placeBid('${c.id}'))">Place bid</button></div>
   <div class="flex flex-wrap items-center gap-2 mt-2 text-xs"><span class="text-slate-500">Minimum next bid</span><b class="font-mono">${fmt(min)}/kg</b><span class="grow"></span>${[['Min', 0], ['+₱5', 5], ['+₱10', 10]].map(([l, st]) => `<button type="button" class="pill border" onclick="${st ? `bumpBid('${c.id}',${st})` : `setBid('${c.id}',${min})`}">${l === 'Min' ? '<span>Min</span>' : l}</button>`).join('')}</div>${mine ? '<div class="text-xs text-emerald-700 mt-2">You hold the top bid.</div>' : ''}</div>` : '';
-      const rows = act.map(x => { const s = LOT_BADGE[lotState(x)], xEnd = biddingEndsAt(x); return `<tr tabindex="0" onclick="S.sel='${x.id}';render()" class="border-t cursor-pointer ${x.id === c.id ? 'bg-teal-50' : 'hover:bg-slate-50'}"><td class="p-3"><b class="font-mono">${x.id}</b><br><span class="text-xs">${x.name}</span></td><td>${x.kg}kg × ${x.tubs}</td><td class="font-mono">${fmt(x.bid)}${x.bid_count ? `<div class="text-xs font-sans ${x.bid_by === S.uid ? 'text-emerald-600' : 'text-slate-500'}">${x.bid_by === S.uid ? '<span>You lead</span>' : bidder(x.bid_by, x.bid_by_ident)}</div>` : ''}</td><td><span class="badge ${s[1]}">${s[0]}</span>${lotState(x) === 'live' ? `<div class="text-xs font-mono mt-1" data-end="${xEnd}" data-lot="${x.id}">${mmss(Date.parse(xEnd) - Date.now())} remaining</div>` : ''}${bpWon(x) ? `<div class="text-xs mt-1 ${bpOf(x.id) ? 'text-emerald-700' : 'text-amber-700 font-semibold'}">${bpOf(x.id) ? 'Paid' : 'Payment due'}</div>` : ''}</td></tr>` }).join('');
+      const rows = act.map(x => { const s = LOT_BADGE[lotState(x)], xEnd = biddingEndsAt(x); return `<tr tabindex="0" onclick="S.sel='${x.id}';render()" class="border-t cursor-pointer ${x.id === c.id ? 'bg-teal-50' : 'hover:bg-slate-50'}"><td class="p-3"><b class="font-mono">${x.id}</b><br><span class="text-xs">${x.name}</span></td><td>${x.kg}kg × ${x.tubs}</td><td class="font-mono">${fmt(x.bid)}${x.bid_count ? `<div class="text-xs font-sans ${x.bid_by === S.uid ? 'text-emerald-600' : 'text-slate-500'}">${x.bid_by === S.uid ? '<span>You lead</span>' : bidder(x.bid_by, x.bid_by_ident)}</div>` : ''}</td><td><span class="badge ${s[1]}">${s[0]}</span>${lotState(x) === 'live' ? `<div class="text-xs font-mono mt-1" data-end="${xEnd}" data-lot="${x.id}">${mmss(Date.parse(xEnd) - Date.now())} remaining</div>` : ''}${bpWon(x) ? `<div class="text-xs mt-1 ${bpOf(x.id) ? 'text-emerald-700' : 'text-amber-700 font-semibold'}">${bpOf(x.id) ? (bpOf(x.id).method === 'cashless' ? 'Paid (demo)' : 'Cash due') : 'Payment due'}</div>` : ''}</td></tr>` }).join('');
       return head + `<div class="grid grid-cols-3 gap-3 mb-4">${[['Active lots', v.length], ['Tubs in stock', act.reduce((a, x) => a + x.tubs, 0)]].map(([a, b]) => `<div class="card p-4"><div class="text-xs font-mono text-slate-500">${a}</div><div class="font-mono text-2xl font-bold">${b}</div></div>`).join('')}<div class="card p-4"><div class="text-xs font-mono text-slate-500">Live bids</div><div id="liveTile" class="font-mono font-bold ${lc}" aria-live="polite">${lt}</div></div></div>
 <div class="grid lg:grid-cols-2 gap-4 items-start"><div class="card overflow-x-auto"><table class="w-full text-sm"><thead class="text-xs font-mono text-left text-slate-500"><tr><th class="p-3">Batch</th><th>Volume</th><th>Top bid</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>
 <div class="card p-5">${c.photo ? `<img src="${c.photo}" class="w-full h-44 object-cover rounded-lg mb-3" alt="">` : ''}<div class="font-mono text-xs text-slate-500">SELECTED · ${c.id}</div><h2 class="font-semibold text-lg">${c.name}</h2><p class="text-xs keep-c">${c.src}</p>
@@ -3461,7 +3477,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       const tubsCount = o.tubs || Math.max(1, Math.ceil((+o.kg || 1) / 25));
       const dest = o.kind === 'pier_acquisition' ? o.pierLocation : o.marketName;
       const tsStr = new Date(o.updatedAt || o.createdAt).toLocaleString();
-      const escrowStr = o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held');
+      const escrowStr = o.escrowStatus || 'Payment not verified';
       const d = document.createElement('div');
       d.id = 'ordReceiptLayer';
       d.className = 'fixed inset-0 bg-[#0B0E17]/75 flex items-center justify-center p-4 z-50 overflow-y-auto';
@@ -3476,7 +3492,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
           ${kv('Tubs / Weight', esc(tubsCount + ' tub(s) · ' + o.kg + ' kg'))}
           ${kv('Destination', esc(dest))}
           ${kv('Timestamp', esc(tsStr))}
-          ${kv('Escrow Status', esc(escrowStr))}
+          ${kv('Payment status', esc(escrowStr))}
         </div>
         <div class="flex justify-between items-center py-3 mt-1 border-b border-dashed border-slate-300"><span class="font-bold text-base">Agreed Total</span><span class="font-mono font-bold text-xl text-emerald-600">${'₱' + fmt(o.total).replace(/^₱/, '')}</span></div>
         ${qrText ? `<div class="mt-4"><div class="qr-frame qr-white-box rounded-xl p-3 mx-auto w-[220px] max-w-full border border-slate-300 bg-white shadow-sm" style="background:#ffffff;color:#000000">${qrSvg(qrText)}</div><div class="font-mono text-xs font-bold text-[#0B4A5D] mt-2">SCAN QR TO VERIFY · ${esc(o.passId || o.id)}</div></div>` : `<p class="mt-3 text-xs text-slate-500">Order QR pass is not available for this order.</p>`}
@@ -3515,7 +3531,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       row('Tubs / Weight', (o.tubs || 1) + ' tub(s) · ' + o.kg + ' kg');
       row('Destination', o.kind === 'pier_acquisition' ? o.pierLocation : o.marketName);
       row('Timestamp', new Date(o.updatedAt || o.createdAt).toLocaleString());
-      row('Escrow Status', o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held'));
+      row('Payment status', o.escrowStatus || 'Payment not verified');
       line();
       x.textAlign = 'left'; x.fillStyle = '#0B0E17'; x.font = 'bold 18px ' + SANS; x.fillText('Agreed Total', 32, y + 4);
       x.textAlign = 'right'; x.fillStyle = '#059669'; x.font = 'bold 22px ' + MONO; x.fillText('₱' + fmt(o.total).replace(/^₱/, ''), W - 32, y + 4);
@@ -3559,7 +3575,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
           let body = '', actions = '', recvLayout = '', chat = '', rate = '';
           const hasQrBtn = canShowOrderQr(o);
           if (isAcq) {
-            body = `<div class="text-xs text-slate-600 mt-1">Pier Dock: <b>${esc(o.pierLocation)}</b> · Broker: <b>${esc(o.brokerIdent)}</b> · Total: <b class="font-mono">${fmt(o.total)}</b> · Escrow: <b>${esc(o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held'))}</b></div>`;
+            body = `<div class="text-xs text-slate-600 mt-1">Pier Dock: <b>${esc(o.pierLocation)}</b> · Broker: <b>${esc(o.brokerIdent)}</b> · Total: <b class="font-mono">${fmt(o.total)}</b> · Payment: <b>${esc(o.escrowStatus || 'Payment not verified')}</b></div>`;
             if (o.status === 'Cancelled') {
               body += `<div class="mt-3 rounded-lg border border-red-300 bg-red-50 text-red-800 p-3 text-sm font-semibold" role="status">Order Cancelled. The Broker cancelled this order${o.updatedAt ? ' on ' + esc(new Date(o.updatedAt).toLocaleString()) : ''}. Inspection and check-in are disabled.</div>`;
               if (r === 'checker') actions = `<div class="flex flex-col sm:flex-row gap-2 mt-3"><button class="btn flex-1 min-h-[44px]" disabled aria-disabled="true">Accept Bid</button><button class="btn2 flex-1 min-h-[44px]" disabled aria-disabled="true">Scan QR Release Pass</button></div>`;
@@ -3585,7 +3601,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
               rate = renderRatingForm(o, r, r === 'checker' ? 'Consignee Broker' : 'Pier Checker (Quality & Dock Speed)');
             }
           } else {
-            body = `<div class="text-xs text-slate-600 mt-1">Destination: <b>${esc(o.marketName)}</b>${o.stallNote ? ' (' + esc(o.stallNote) + ')' : ''} · Fulfillment: <b>${o.fulfillment === 'broker_delivery' ? 'Broker Transport' : 'Pier Self-Pickup'}</b> · Total: <b class="font-mono">${fmt(o.total)}</b> · Escrow: <b>${esc(o.escrowStatus || (o.status === 'Delivered' ? 'Released' : 'Escrow Held'))}</b></div>`;
+            body = `<div class="text-xs text-slate-600 mt-1">Destination: <b>${esc(o.marketName)}</b>${o.stallNote ? ' (' + esc(o.stallNote) + ')' : ''} · Fulfillment: <b>${o.fulfillment === 'broker_delivery' ? 'Broker Transport' : 'Pier Self-Pickup'}</b> · Total: <b class="font-mono">${fmt(o.total)}</b> · Payment: <b>${esc(o.escrowStatus || 'Payment not verified')}</b></div>`;
             if (o.vehicle) body += `<div class="rounded-lg bg-slate-50 border border-slate-200 p-2.5 mt-2 text-xs"><b>Vehicle:</b> ${esc(o.vehicle.vehicleType)} (${esc(o.vehicle.plateNo)}) · <b>Driver:</b> ${esc(o.vehicle.driverName)} (${esc(o.vehicle.contactNo)})</div>`;
             if (ORD_TAB === 'all' && o.status === 'Pending Approval') {
               if (r === 'broker') {
@@ -3600,7 +3616,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
               const rightCol = `<div class="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52">${r === 'vendor' ? (hasQrBtn ? `<button type="button" class="btn min-h-[44px] !max-h-none" onclick="openOrderQrModal('${esc(o.id)}')">Show QR Code</button>` : '') : `<button class="btn min-h-[44px] !max-h-none" onclick="openOrderScanner('${o.id}','market')">📷 Scan Market Delivery QR</button>`}<button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="openOrderReceiptModal('${esc(o.id)}')">📄 View Receipt</button><button type="button" class="btn2 min-h-[44px] !max-h-none" onclick="dlOrderReceipt('${esc(o.id)}')">⬇️ Download Receipt</button></div>`;
               recvLayout = `<div class="mt-3 p-3 rounded-xl border border-teal-200 bg-teal-50/50 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">${leftCol}${rightCol}</div>`;
               if (ORD_TAB === 'receive' && r === 'broker' && o.status === 'Accepted' && o.fulfillment === 'broker_delivery') {
-                actions = `<div class="mt-3 p-3 rounded-xl border border-amber-300 bg-amber-50"><div class="text-xs font-mono font-semibold text-amber-900 uppercase mb-2">Assign Broker Transport Fleet</div><div class="grid sm:grid-cols-2 gap-2"><input id="drv-${o.id}" class="inp" placeholder="Driver Name"><select id="veh-${o.id}" class="inp">${Object.keys(FLEET_TYPES).map(v => `<option>${v}</option>`).join('')}</select><input id="plt-${o.id}" class="inp" placeholder="Plate # / Vehicle ID"><input id="cnt-${o.id}" class="inp" placeholder="Driver Contact #"></div><button class="btn !w-full mt-2" onclick="dispatchVendorOrder('${o.id}')">🚚 Assign Vehicle & Mark In Transit</button></div>`;
+                actions = `<div class="mt-3 p-3 rounded-xl border border-amber-300 bg-amber-50"><div class="text-xs font-mono font-semibold text-amber-900 uppercase mb-2">Assign Broker Transport Fleet</div><div class="grid sm:grid-cols-2 gap-2"><input id="drv-${o.id}" class="inp" aria-label="Driver name" placeholder="Driver Name"><select id="veh-${o.id}" class="inp" aria-label="Vehicle type">${Object.keys(FLEET_TYPES).map(v => `<option>${v}</option>`).join('')}</select><input id="plt-${o.id}" class="inp" aria-label="Plate number or vehicle ID" placeholder="Plate # / Vehicle ID"><input id="cnt-${o.id}" class="inp" aria-label="Driver contact number" placeholder="Driver Contact #"></div><button class="btn !w-full mt-2" onclick="dispatchVendorOrder('${o.id}')">🚚 Assign Vehicle & Mark In Transit</button></div>`;
               }
               if (ORD_TAB === 'receive') chat = renderChatBox(o, 'Broker ↔ Micro-Vendor Chat');
             }
@@ -3660,7 +3676,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
     //-> Confirms removal of a queued offline claim, updates S.queue, and re-renders the pending-transaction list.
     async function delQ(i) { if (!S.queue[i]) return; if (!await ask('Remove saved transaction?', 'This saved claim has not been sent yet. Removing it cannot be undone.', 'Remove', 1)) return; S.queue.splice(i, 1); render() }
     const bell = () => `<button onclick="toggleND()" class="relative text-xs border rounded-lg px-2 py-1.5" aria-label="Notifications (N)">🔔${S.unread ? `<span class="absolute -top-2 -right-2 bg-red-600 text-white text-[0.625rem] font-bold rounded-full px-1.5 min-w-[18px]">${S.unread}</span>` : ''}</button><button onclick="togSound()" class="text-xs border rounded-lg px-2 py-1.5" aria-label="Sound">${S.mute ? '🔇' : '🔊'}</button>`;
-    const ndModal = () => !S.nd ? '' : `<div class="fixed inset-0 z-50"><div class="absolute inset-0 bg-black/50" onclick="toggleND()"></div><aside class="drawer-r absolute right-0 top-0 h-full w-full max-w-sm bg-white card overflow-y-auto p-4" role="dialog" aria-modal="true"><div class="flex justify-between items-center"><h2 class="font-mono font-bold text-lg">Notifications</h2><button onclick="toggleND()" aria-label="Close" class="text-2xl leading-none px-1">×</button></div>${TTS.ok ? `<div class="card p-3 mt-3 flex items-center justify-between gap-3"><span class="text-sm">${TTS.alerts ? 'Voice is on. New alerts will be read aloud.' : 'Voice is off. Tap the speaker on any alert to hear it.'}</span><button type="button" class="btn2 !px-3 !py-2 text-xs shrink-0" aria-pressed="${TTS.alerts}" onclick="TTS.setAlerts(${!TTS.alerts})">${TTS.alerts ? 'Turn off' : 'Turn on'}</button></div>` : ''}${S.notes.length ? `<button class="text-xs text-[#006878] font-semibold mt-2" onclick="S.notes=[];render()">Clear all</button>` : '<p class="text-sm text-slate-500 mt-4">No notifications yet.</p>'}${S.notes.map((n, i) => `<div class="card p-3 mt-3 flex items-start gap-2"><div class="min-w-0 flex-1"><div id="nt${i}"><b class="text-sm">${esc(n.title)}</b><div class="text-sm">${esc(n.body)}</div></div><div class="text-xs text-slate-500">${n.t}</div></div>${TTS.btn('n' + i, '#nt' + i)}</div>`).join('')}</aside></div>`;
+    const ndModal = () => !S.nd ? '' : `<div class="fixed inset-0 z-50"><div class="absolute inset-0 bg-black/50" onclick="toggleND()"></div><aside class="drawer-r absolute right-0 top-0 h-full w-full max-w-sm bg-white card overflow-y-auto p-4" role="dialog" aria-modal="true" aria-label="Notifications"><div class="flex justify-between items-center"><h2 class="font-mono font-bold text-lg">Notifications</h2><button onclick="toggleND()" aria-label="Close" class="text-2xl leading-none px-1">×</button></div>${TTS.ok ? `<div class="card p-3 mt-3 flex items-center justify-between gap-3"><span class="text-sm">${TTS.alerts ? 'Voice is on. New alerts will be read aloud.' : 'Voice is off. Tap the speaker on any alert to hear it.'}</span><button type="button" class="btn2 !px-3 !py-2 text-xs shrink-0" aria-pressed="${TTS.alerts}" onclick="TTS.setAlerts(${!TTS.alerts})">${TTS.alerts ? 'Turn off' : 'Turn on'}</button></div>` : ''}${S.notes.length ? `<button class="text-xs text-[#006878] font-semibold mt-2" onclick="S.notes=[];render()">Clear all</button>` : '<p class="text-sm text-slate-500 mt-4">No notifications yet.</p>'}${S.notes.map((n, i) => `<div class="card p-3 mt-3 flex items-start gap-2"><div class="min-w-0 flex-1"><div id="nt${i}"><b class="text-sm">${esc(n.title)}</b><div class="text-sm">${esc(n.body)}</div></div><div class="text-xs text-slate-500">${n.t}</div></div>${TTS.btn('n' + i, '#nt' + i)}</div>`).join('')}</aside></div>`;
     /* Sidebar section: a title and a one-line description above its control (both pass through tr(), so they follow the chosen language). */
     const sbSec = (t, d, b) => `<div><div class="text-sm font-semibold">${t}</div><p class="text-xs text-slate-600 mb-1.5">${d}</p>${b}</div>`;
     const sbModal = () => !S.sb ? '' : `<div class="fixed inset-0 z-50"><div class="absolute inset-0 bg-black/50" onclick="closeSb()"></div><aside class="drawer-r absolute right-0 top-0 h-full w-80 max-w-[88%] bg-white card overflow-y-auto p-4 pb-24 flex flex-col" role="dialog" aria-modal="true" aria-label="Menu"><div class="flex items-start gap-2"><div class="min-w-0 flex-1">${sidebarProfile()}</div><button data-af onclick="closeSb()" aria-label="Close" class="text-2xl leading-none px-2 min-h-[44px]">×</button></div>
@@ -3672,7 +3688,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
 <div class="my-auto py-6"><button data-k="logout" onclick="run(this,'Signing out…',()=>{S.sb=false;return logout()})" class="btn2 w-full !border-red-300 text-red-700 font-semibold">Sign Out</button></div></aside></div>`;
     const TOURS = {
       vendor: [['floor', 'nav', 'Navigation cards', 'Tap a card to move between Fresh Catches Floor, Taripa Calculator, Offline Sync, and Orders.'], ['floor', '.ni-reef', 'Fresh Catches Floor', 'Everything landed at the pier today. Browse by category, or tap Hati-Hati Banyera to see only tubs that are already being shared.'], ['floor', 'article', 'Pick a catch', 'Each card shows the price per kg and how much of the tub is still open.'], ['floor', 'article button.btn', 'Hati-Hati portion', 'Tap Claim Portion, then use − / + or the quick chips to set your kilos.'], ['taripa', '.card.p-5', 'Taripa Calculator', 'Pick a catch and your kilos to see the base price, port fee, commission and total payable before you commit.'], ['sync', 'main', 'Offline Sync', 'Claims made without signal wait here until you sync. You can remove a saved claim before it goes through.'], ['orders', 'main', 'Orders', 'Track your active orders, view your Delivery QR Pass & Official Receipt, chat with your Broker, and rate completed deliveries.']],
-      checker: [['intake', 'nav', 'Navigation bar', 'Switch between Fish Log Floor, Validation Register, Offline Sync, and Orders here.'], ['intake', 'form', 'Dockside intake', 'Log each landing: name, weight, tubs, prices and three photos. The AI inspects them when you submit.'], ['intake', '#evp0', '3-angle proof', 'Capture front, middle and bottom photos. The AI uses them to run the checklist, give the freshness score and pass or flag the lot.'], ['quality', 'main', 'Validation register', 'Every inspection is listed here with its evidence.'], ['orders', 'main', 'Orders', 'Accept winning bids, scan the Broker QR Release Pass at the dock, and rate hand-offs.']],
+      checker: [['intake', 'nav', 'Navigation bar', 'Switch between Fish Log Floor, Validation Register, Offline Sync, and Orders here.'], ['intake', 'form', 'Dockside intake', AI_DEMO ? 'Log each landing with three photos. Demo mode gives a random rating and passes every valid submission.' : 'Log each landing: name, weight, tubs, prices and three photos. The AI inspects them when you submit.'], ['intake', '#evp0', '3-angle proof', AI_DEMO ? 'Add front, middle and bottom photos. The demo rating is random and does not assess fish quality.' : 'Capture front, middle and bottom photos. The AI uses them to run the checklist, give the freshness score and pass or flag the lot.'], ['quality', 'main', 'Validation register', 'Every inspection is listed here with its evidence.'], ['orders', 'main', 'Orders', 'Accept winning bids, scan the Broker QR Release Pass at the dock, and rate hand-offs.']],
       broker: [['auction', 'main table', 'Live bidding', 'Bids refresh by themselves. The bell alerts you when you are outbid.'], ['auction', '.card.p-5', 'Taripa breakdown', 'See base price, port fee, commission and total payable for the lot.'], ['orders', 'main', 'Orders & QR Verification', 'View your Pier Acquisition QR Passes, dispatch delivery fleet to market vendors, and scan Market Delivery QR codes.']]
     };
     // ---> guided workspace tutorial <---
@@ -3900,7 +3916,7 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
       });
       ps.filter(p => p.status !== 'cancelled').forEach(p => {
         const lot = find(p.cid), pr = lot ? +lot.price : null;
-        ev.push({ k: 'claim', ts: p.created_at, id: p.id, ref: p.cid, title: p.name, qty: `${p.kg} kg`, price: pr, total: +p.total, note: p.status === 'escrow' ? ((p.pay || payOf(p) || {}).method === 'cashless' ? 'Paid online (cashless)' : 'Cash · waiting for the QR scan') : 'Payment released' });
+        ev.push({ k: 'claim', ts: p.created_at, id: p.id, ref: p.cid, title: p.name, qty: `${p.kg} kg`, price: pr, total: +p.total, note: p.status === 'escrow' ? ((p.pay || payOf(p) || {}).method === 'cashless' ? 'Paid (cashless demo)' : 'Cash · waiting for the QR scan') : 'Pickup verified' });
         if (p.status === 'released' && !p.order_id) ev.push({ k: 'delivered', ts: p.scanned_at || p.created_at, id: p.id, ref: p.cid, title: p.name, qty: `${p.kg} kg`, price: pr, total: +p.total, note: p.scanned_at ? 'Verified by QR scan' : 'Released by broker' })
       });
       ordRead().filter(o => o.status === 'Delivered' && (S.role === 'checker' ? o.kind === 'pier_acquisition' : S.role === 'vendor' ? o.kind === 'vendor_sale' : true)).forEach(o => {
@@ -3927,8 +3943,8 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
     function histV() {
       const all = histEvents(), ps = histPasses(), n = k => all.filter(e => e.k === k).length, l = HF === 'all' ? all : all.filter(e => e.k === HF);
       const ck = S.role === 'checker', lg = ck ? Object.values(loggedMap()) : [];
-      const tiles = ck ? [['Lots logged', n('logged')], ['Passed', lg.filter(x => x.res === 'Passed').length], ['Flagged', lg.filter(x => x.res === 'Flagged').length], ['Sold out', n('sold')]] : [['Transactions', all.length], ['Total paid', fmt(ps.reduce((a, p) => a + (+p.total || 0), 0))], ['Kg claimed', ps.reduce((a, p) => a + (+p.kg || 0), 0)], ['Delivered', n('delivered')]];
-      const pills = ck ? [['all', 'All', all.length], ['logged', 'Logged', n('logged')], ['auction', 'Auctioned', n('auction')], ['sold', 'Sold Out', n('sold')]] : [['all', 'All', all.length], ['auction', 'Auctioned', n('auction')], ['claim', 'Claimed & Paid', n('claim')], ['delivered', 'Delivered', n('delivered')], ['sold', 'Sold Out', n('sold')]];
+      const tiles = ck ? [['Lots logged', n('logged')], ['Passed', lg.filter(x => x.res === 'Passed').length], ['Flagged', lg.filter(x => x.res === 'Flagged').length], ['Sold out', n('sold')]] : [['Transactions', all.length], ['Claim value', fmt(ps.reduce((a, p) => a + (+p.total || 0), 0))], ['Kg claimed', ps.reduce((a, p) => a + (+p.kg || 0), 0)], ['Delivered', n('delivered')]];
+      const pills = ck ? [['all', 'All', all.length], ['logged', 'Logged', n('logged')], ['auction', 'Auctioned', n('auction')], ['sold', 'Sold Out', n('sold')]] : [['all', 'All', all.length], ['auction', 'Auctioned', n('auction')], ['claim', 'Claims', n('claim')], ['delivered', 'Delivered', n('delivered')], ['sold', 'Sold Out', n('sold')]];
       return h1('Transaction / Sales History', 'Every auction, claim, payment and delivery, newest first.')
         + `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">${tiles.map(([a, b]) => `<div class="card p-4"><div class="text-xs font-mono text-slate-500">${a}</div><div class="font-mono text-xl font-bold">${b}</div></div>`).join('')}</div>`
         + `<div class="flex gap-2 overflow-x-auto mb-4" role="group" aria-label="History filter">${pills.map(([k, t, c]) => `<button class="pill border ${HF === k ? 'on' : ''}" aria-pressed="${HF === k}" onclick="HF='${k}';render()">${t} · ${c}</button>`).join('')}</div>`
@@ -4014,10 +4030,10 @@ ${aiStatHtml()}<p class="text-xs text-slate-500 mt-1">Add three clear photos of 
 <script>
 /* ===== DEAL workflow overrides: every transaction is now stored and enforced in Supabase (see deal_workflow_upgrade.sql) ===== */
 const mapOrder = r => { const v = r.kind === 'vendor', st = r.status, mk = MARKETS[r.market];
-  const s = st === 'pending_acceptance' ? (v ? 'Pending Approval' : 'Pending Acceptance') : st === 'accepted' ? (v && r.stage === 'on_delivery' ? 'In Transit' : 'Accepted') : st === 'completed' ? 'Delivered' : 'Rejected';
+  const s = st === 'pending_acceptance' ? (v ? 'Pending Approval' : 'Pending Acceptance') : st === 'accepted' ? (v && r.stage === 'on_delivery' ? 'In Transit' : 'Accepted') : st === 'completed' ? 'Delivered' : r.cancelled_at ? 'Cancelled' : 'Rejected';
   return { srv: 1, id: r.id, kind: v ? 'vendor_sale' : 'pier_acquisition', cid: r.cid, catchName: esc(r.catch_name || ''), kg: +r.kg, pricePerKg: +r.price_per_kg, total: +r.total,
     brokerId: r.broker_id, vendorId: r.vendor_id, checkerId: r.checker_id, brokerIdent: esc(r.broker_ident || 'Broker'), vendorIdent: esc(r.vendor_ident || 'Micro-Vendor'), checkerIdent: 'Pier Checker',
-    status: s, stage: r.stage, escrowStatus: st === 'completed' ? 'Released' : 'Escrow Held', payMethod: r.payment_method, payRef: r.payment_ref,
+    status: s, stage: r.stage, escrowStatus: r.payment_method === 'cashless' ? 'Paid (demo)' : 'Cash due; not verified', payMethod: r.payment_method, payRef: r.payment_ref,
     fulfillment: r.fulfillment === 'delivery' ? 'broker_delivery' : 'self_pickup', marketId: r.market, marketName: mk ? mk.name : (LEGACY_MARKETS[r.market] || (r.market ? 'Destination: ' + esc(r.market) : 'Navotas Pier Dock')), stallNote: r.instruction || '',
     pierStation: r.src, pierLocation: r.src, vehicle: r.vehicle || null, route: r.vehicle ? calcMarketRoute(r.market, r.vehicle.vehicleType, +r.kg) : null, qrPayload: r.qr_payload || null, chats: (SRV_CH[r.id] || []), ratings: Object.fromEntries(Object.entries(r.ratings || {}).map(([k, v]) => [k, { stars: v.stars, comment: esc(v.comment || ''), at: new Date(v.at).toLocaleString() }])), createdAt: r.created_at, updatedAt: r.updated_at } };
 let SRV_CH = {};
@@ -4056,12 +4072,12 @@ async function clearAllOrders() {
     await loadSrvOrders(); render(); toast((Number(data) || 0) + ' completed or rejected order(s) cleared from your view.');
   } catch (e) { toast('Could not clear orders. Check your connection and try again.', 1) }
 }
-function cancelOrder() { toast('Pending orders are accepted or rejected by the other party.', 1) }
+async function cancelOrder(id) { if (!await ask('Cancel this order?', 'Cancel this pending order? Reserved stock will return to the floor.', 'Cancel order', true)) return; await rpcDo('cancel_pending_order', { p_id: id }, 'Order cancelled.'); }
 const PICKUP_MSG = 'Please pick up at the pier', WAIT_MSG = 'Please wait until your order is delivered';
 function orderControls(o) { if (!o.srv || ORD_TAB === 'rate') return '';
   let h = '';
   if (S.role === 'broker' && o.kind === 'vendor_sale' && (o.status === 'Accepted' || o.status === 'In Transit')) {
-    h += `<div class="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50"><div class="text-xs font-mono font-semibold text-slate-600 uppercase mb-2">Fulfillment instruction</div><div class="flex flex-col sm:flex-row gap-2"><select id="ins-${o.id}" class="inp flex-1"><option ${o.stallNote === PICKUP_MSG ? 'selected' : ''}>${PICKUP_MSG}</option><option ${o.stallNote !== PICKUP_MSG ? 'selected' : ''}>${WAIT_MSG}</option></select><button type="button" class="btn2" onclick="saveInstruction('${o.id}')">Save</button>${o.fulfillment === 'self_pickup' && o.stage === 'placed' ? `<button type="button" class="btn" onclick="markReady('${o.id}')">Mark Ready for pickup</button>` : ''}</div></div>` }
+    h += `<div class="mt-3 p-3 rounded-xl border border-slate-200 bg-slate-50"><div class="text-xs font-mono font-semibold text-slate-600 uppercase mb-2">Fulfillment instruction</div><div class="flex flex-col sm:flex-row gap-2"><select id="ins-${o.id}" class="inp flex-1" aria-label="Fulfillment instruction"><option ${o.stallNote === PICKUP_MSG ? 'selected' : ''}>${PICKUP_MSG}</option><option ${o.stallNote !== PICKUP_MSG ? 'selected' : ''}>${WAIT_MSG}</option></select><button type="button" class="btn2" onclick="saveInstruction('${o.id}')">Save</button>${o.fulfillment === 'self_pickup' && o.stage === 'placed' ? `<button type="button" class="btn" onclick="markReady('${o.id}')">Mark Ready for pickup</button>` : ''}</div></div>` }
   return h }
 async function brokerNote(id, txt) { await rpcDo('broker_set_order', { p_id: id, p_stage: (ordRead().find(x => x.id === id) || {}).stage || 'placed', p_instruction: txt }) }
 async function verifyOrderQr(orderId, raw, phase) {
@@ -4073,7 +4089,7 @@ async function bpGo() { const m = S.bp; if (!m) return; const { data, error } = 
   if (error || !data || !data.success) return toast((error && error.message) || (data && data.message) || 'Payment failed.', 1);
   await load(1); S.bp = null; S.br = m.id; toast(data.message); render() }
 async function doClaim(id, kg, pay, ship) { ship = ship || {};
-  const { data, error } = await sb.rpc('claim_from_floor', { p_cid: id, p_kg: kg, p_method: (pay && pay.method) || 'cash', p_fulfillment: ship.fulfillment === 'self_pickup' ? 'pickup' : 'delivery', p_market: ship.marketId || null, p_note: ship.stallNote || null });
+  const { data, error } = await sb.rpc('claim_from_floor_once', { p_request_id: crypto.randomUUID(), p_cid: id, p_kg: kg, p_method: (pay && pay.method) || 'cash', p_fulfillment: ship.fulfillment === 'self_pickup' ? 'pickup' : 'delivery', p_market: ship.marketId || null, p_note: ship.stallNote || null });
   if (error || !data || !data.success) { toast((error && error.message) || (data && data.message) || 'Claim failed.', 1); return false }
   S.pm = null; S.pay = null; S.pass = null; await load(1); playChime(); speakOrderPlaced(); toast(data.message); render(); return true }
 </script>
